@@ -95,29 +95,29 @@ print('Test Accuracy of SVC = ', svc.score(X_test, y_test))
 # Check the prediction time for a single sample
 t=time.time()
 prediction = svc.predict(X_test[0].reshape(1, -1))
+print("prediction",prediction)
 t2 = time.time()
 print(t2-t, 'Seconds to predict with SVC')
 
 
 # # Sliding Window Implementation
 
-# In[246]:
+# In[3]:
 
 def draw_rectangles(img,window_list,color= (255,255,255)):
+    labeled_img = img.copy()
     for window in window_list:
-        print('window[0] = ',window[0]) 
-        print('window[1] = ',window[1])
         pt1 = window[0]
         pt2 = window[1]
         thickness = 4
-        cv2.rectangle(img, pt1, pt2, color, thickness)
-    return img
+        cv2.rectangle(labeled_img, pt1, pt2, color, thickness)
+    return labeled_img
 
 
-# In[251]:
+# In[4]:
 
 # Implement a sliding-window technique and use your trained classifier to search for vehicles in images.
-img = cv2.imread('test_images/test3.jpg')
+img = cv2.imread('test_images/test1.jpg')
 img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
 height, width, channels = img.shape
 print('height, width, channels = ',height, width, channels)
@@ -129,33 +129,52 @@ start_h = step_h#int(height/4)
 stop_h = height 
 size_of_sq = int(256 * (1/height))
 original_y_val = int(9*height/16) #int(6*height/11)
+# original_y_val = int(6*height/12)
 y_val = original_y_val
 overlap = 0.75
 rectangles = []
 while y_val<height:
-    size_of_sq = int(800000 * (y_val/height) ** 14)
-    window_list = slide_window(img, x_start_stop=[0, width], y_start_stop=[y_val,y_val+2*size_of_sq], 
+    size_of_sq = int(500000 * (y_val/height) ** 16)
+#     size_of_sq = int(3000 * (y_val/height) ** 8)
+    window_list = slide_window(img, x_start_stop=[0, width], y_start_stop=[y_val,y_val+size_of_sq], 
                     xy_window=(size_of_sq, size_of_sq), xy_overlap=(overlap,overlap))
-    print (len(window_list))
-    print ((window_list[1]))
-    if y_val== original_y_val:
-        rectangles = list(window_list)
-    else:
-        rectangles = np.concatenate((rectangles,window_list))
+    rectangles.extend(window_list)
 
     y_val = y_val + (1-overlap)*size_of_sq
 
-img = draw_rectangles(img,rectangles)
+print("num rectangles = ", len(rectangles))
+labeled_img = draw_rectangles(img,rectangles)
+plt.imshow(labeled_img)
+plt.show()
 plt.imshow(img)
 plt.show()
 
 
-# In[ ]:
+# In[6]:
 
-# test on the test_images folder
+detected_img = img.copy()
+for rectangle in rectangles:
+    pt1 = rectangle[0]
+    pt2 = rectangle[1]
+    crop_img = img[pt1[1]:pt2[1], pt1[0]:pt2[0]]
+    size = (64,64)
+    crop_img = cv2.resize(crop_img, size)
 
+    img_features =[]
+    hog_channel=0
+    spatial_features = bin_spatial(crop_img, size=(32,32))
+    hist_features = color_hist(crop_img, nbins=32, bins_range=(0,256))
+    hog_features = get_hog_features(crop_img[:,:,hog_channel], orient=9, 
+                    pix_per_cell=8, cell_per_block=2, vis=False, feature_vec=True)
+    img_features.append(np.concatenate((spatial_features, hist_features, hog_features)))
+    X = np.vstack((img_features)).astype(np.float64)                        
+    X = X.reshape(1, -1)
+    scaled_X = X_scaler.transform(X)
+    prediction = svc.predict(scaled_X.reshape(1, -1))
+    if prediction == 1:
+        thickness = 4
+        cv2.rectangle(detected_img, pt1, pt2, (255,255,255),thickness)
 
-# In[ ]:
-
-
+plt.imshow(detected_img)
+plt.show()
 

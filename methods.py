@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[13]:
+# In[1]:
 
 import cv2
 import numpy as np
@@ -20,7 +20,7 @@ from skimage.feature import hog
 from sklearn.model_selection import train_test_split
 
 
-# In[14]:
+# In[2]:
 
 def plot3d(pixels, colors_rgb,
         axis_labels=list("RGB"), axis_limits=[(0, 255), (0, 255), (0, 255)]):
@@ -51,7 +51,7 @@ def plot3d(pixels, colors_rgb,
     return ax  # return Axes3D object for further manipulation
 
 
-# In[15]:
+# In[3]:
 
 # Define a function to compute binned color features  
 def bin_spatial(img, size=(32, 32)):
@@ -61,7 +61,7 @@ def bin_spatial(img, size=(32, 32)):
     return features
 
 
-# In[16]:
+# In[4]:
 
 # Define a function to compute color histogram features  
 def color_hist(img, nbins=32, bins_range=(0, 256)):
@@ -75,7 +75,7 @@ def color_hist(img, nbins=32, bins_range=(0, 256)):
     return hist_features
 
 
-# In[17]:
+# In[5]:
 
 # Define a function to return HOG features and visualization
 def get_hog_features(img, orient, pix_per_cell, cell_per_block, 
@@ -94,7 +94,7 @@ def get_hog_features(img, orient, pix_per_cell, cell_per_block,
         return features
 
 
-# In[18]:
+# In[6]:
 
 # Define a function to extract features from a list of images
 # Have this function call bin_spatial() and color_hist()
@@ -132,7 +132,7 @@ def extract_features(imgs, cspace='RGB', spatial_size=(32, 32),
     return features
 
 
-# In[19]:
+# In[7]:
 
 # Define a function that takes an image,
 # start and stop positions in both x and y, 
@@ -140,6 +140,7 @@ def extract_features(imgs, cspace='RGB', spatial_size=(32, 32),
 # and overlap fraction (for both x and y)
 def slide_window(img, x_start_stop=[None, None], y_start_stop=[None, None], 
                     xy_window=(64, 64), xy_overlap=(0.5, 0.5)):
+    height, width, channels = img.shape
     # If x and/or y start/stop positions not defined, set to image size
     if x_start_stop[0] == None:
         x_start_stop[0] = 0
@@ -172,7 +173,8 @@ def slide_window(img, x_start_stop=[None, None], y_start_stop=[None, None],
             starty = int(ys*ny_pix_per_step + y_start_stop[0])
             endy = int(starty + xy_window[1])
             # Append window position to list
-            window_list.append(((startx, starty), (endx, endy)))
+            if endy<height and endx < width:
+                window_list.append(((startx, starty), (endx, endy)))
     # Return the list of windows
     return window_list
 
