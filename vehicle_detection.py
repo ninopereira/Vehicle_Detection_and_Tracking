@@ -102,7 +102,7 @@ print(t2-t, 'Seconds to predict with SVC')
 
 # # Sliding Window Implementation
 
-# In[3]:
+# In[30]:
 
 def draw_rectangles(img,window_list,color= (255,255,255)):
     labeled_img = img.copy()
@@ -114,7 +114,7 @@ def draw_rectangles(img,window_list,color= (255,255,255)):
     return labeled_img
 
 
-# In[4]:
+# In[31]:
 
 # Implement a sliding-window technique and use your trained classifier to search for vehicles in images.
 img = cv2.imread('test_images/test1.jpg')
@@ -150,9 +150,14 @@ plt.imshow(img)
 plt.show()
 
 
-# In[6]:
+# In[52]:
+
+CV_FILLED = -1
 
 detected_img = img.copy()
+heat_img = np.zeros_like(img)
+heat_map = np.zeros_like(img)
+
 for rectangle in rectangles:
     pt1 = rectangle[0]
     pt2 = rectangle[1]
@@ -172,9 +177,20 @@ for rectangle in rectangles:
     scaled_X = X_scaler.transform(X)
     prediction = svc.predict(scaled_X.reshape(1, -1))
     if prediction == 1:
-        thickness = 4
-        cv2.rectangle(detected_img, pt1, pt2, (255,255,255),thickness)
+        cv2.rectangle(detected_img, pt1, pt2, (255,255,255),thickness=4)
+        cv2.rectangle(heat_img, pt1, pt2, color=(255,0,0), thickness=CV_FILLED)
+        heat_map = cv2.addWeighted(heat_map, 0.8, heat_img, 0.2, 0)
 
-plt.imshow(detected_img)
+final_img = cv2.addWeighted(img, 0.5, heat_map, 0.5, 0)
+
+f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
+ax1.imshow(img)
+ax1.set_title('original image')
+ax2.imshow(detected_img)
+ax2.set_title('Detected img')
+ax3.imshow(heat_map)
+ax3.set_title('Heat map')
+ax4.imshow(final_img)
+ax4.set_title('Final image')
 plt.show()
 
