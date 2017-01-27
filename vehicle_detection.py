@@ -20,6 +20,8 @@ import glob
 import time
 from sklearn.svm import LinearSVC
 from sklearn.preprocessing import StandardScaler
+from sklearn.externals import joblib
+
 # NOTE: the next import is only valid 
 # for scikit-learn version <= 0.17
 # if you are using scikit-learn >= 0.18 then use this:
@@ -37,7 +39,7 @@ from sklearn.model_selection import train_test_split
 
 # # Combined Color, Histogram and HOG Classification
 
-# In[2]:
+# In[32]:
 
 # Histogram of Oriented Gradients (HOG) feature extraction on a labeled training set of images and train a classifier Linear SVM classifier
 
@@ -57,9 +59,11 @@ for image in images:
 print('cars = ',len(cars))
 print('notcars = ',len(notcars))
 
-orient = 9
-pix_per_cell = 8
-cell_per_block = 2
+orient = 12
+pix_per_cell = 16
+cell_per_block = 4
+
+# experiment other color spaces like LUV, HLS
 
 car_features = extract_features(cars, cspace='RGB', spatial_size=(32, 32),
                        hist_bins=32, hist_range=(0, 256))
@@ -100,9 +104,27 @@ t2 = time.time()
 print(t2-t, 'Seconds to predict with SVC')
 
 
+# In[33]:
+
+print(svc)
+
+
+# In[34]:
+
+# save the model
+joblib.dump(svc, 'svc_model.pkl')
+
+
+# In[35]:
+
+# load the model
+svc = joblib.load('svc_model.pkl')
+print("Model loaded: \n\n",svc)
+
+
 # # Sliding Window Implementation
 
-# In[30]:
+# In[36]:
 
 def draw_rectangles(img,window_list,color= (255,255,255)):
     labeled_img = img.copy()
@@ -114,10 +136,10 @@ def draw_rectangles(img,window_list,color= (255,255,255)):
     return labeled_img
 
 
-# In[31]:
+# In[37]:
 
 # Implement a sliding-window technique and use your trained classifier to search for vehicles in images.
-img = cv2.imread('test_images/test1.jpg')
+img = cv2.imread('test_images/test5.jpg')
 img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
 height, width, channels = img.shape
 print('height, width, channels = ',height, width, channels)
@@ -131,16 +153,28 @@ size_of_sq = int(256 * (1/height))
 original_y_val = int(9*height/16) #int(6*height/11)
 # original_y_val = int(6*height/12)
 y_val = original_y_val
-overlap = 0.75
+overlap = 0.5
 rectangles = []
-while y_val<height:
-    size_of_sq = int(500000 * (y_val/height) ** 16)
-#     size_of_sq = int(3000 * (y_val/height) ** 8)
-    window_list = slide_window(img, x_start_stop=[0, width], y_start_stop=[y_val,y_val+size_of_sq], 
-                    xy_window=(size_of_sq, size_of_sq), xy_overlap=(overlap,overlap))
-    rectangles.extend(window_list)
 
-    y_val = y_val + (1-overlap)*size_of_sq
+size_vec = [64, 96, 128, 160]
+overlap_vec = [0, 0.5, 0.65, 0.8]
+# size_vec = [160]
+# overlap_vec = [0.8]
+for i in range(len(size_vec)):
+    size = size_vec[i]
+    overlap = overlap_vec[i]
+    window_list = slide_window(img, x_start_stop=[0, width+size], y_start_stop=[y_val,y_val+4*size], 
+                    xy_window=(size, size), xy_overlap=(overlap,overlap))
+    rectangles.extend(window_list)
+    
+# while y_val<height:
+# #     size_of_sq = int(500000 * (y_val/height) ** 16)
+#     size_of_sq = int(30000 * (y_val/height) ** 8)
+#     window_list = slide_window(img, x_start_stop=[0, width+size_of_sq], y_start_stop=[y_val,y_val+2*size_of_sq], 
+#                     xy_window=(size_of_sq, size_of_sq), xy_overlap=(overlap,overlap))
+#     rectangles.extend(window_list)
+
+#     y_val = y_val + (1-overlap)*size_of_sq
 
 print("num rectangles = ", len(rectangles))
 labeled_img = draw_rectangles(img,rectangles)
@@ -150,8 +184,9 @@ plt.imshow(img)
 plt.show()
 
 
-# In[52]:
+# In[38]:
 
+# Create the heat map
 CV_FILLED = -1
 
 detected_img = img.copy()
@@ -172,6 +207,7 @@ for rectangle in rectangles:
     hog_features = get_hog_features(crop_img[:,:,hog_channel], orient=9, 
                     pix_per_cell=8, cell_per_block=2, vis=False, feature_vec=True)
     img_features.append(np.concatenate((spatial_features, hist_features, hog_features)))
+#     img_features.append(np.concatenate((hist_features, hog_features)))
     X = np.vstack((img_features)).astype(np.float64)                        
     X = X.reshape(1, -1)
     scaled_X = X_scaler.transform(X)
@@ -193,4 +229,9 @@ ax3.set_title('Heat map')
 ax4.imshow(final_img)
 ax4.set_title('Final image')
 plt.show()
+
+
+# In[ ]:
+
+
 

@@ -94,7 +94,7 @@ def get_hog_features(img, orient, pix_per_cell, cell_per_block,
         return features
 
 
-# In[6]:
+# In[1]:
 
 # Define a function to extract features from a list of images
 # Have this function call bin_spatial() and color_hist()
@@ -128,6 +128,8 @@ def extract_features(imgs, cspace='RGB', spatial_size=(32, 32),
                         pix_per_cell, cell_per_block, vis=False, feature_vec=True)
         # Append the new feature vector to the features list
         features.append(np.concatenate((spatial_features, hist_features, hog_features)))
+#         features.append(np.concatenate((hist_features, hog_features)))    
+        
     # Return list of feature vectors
     return features
 
