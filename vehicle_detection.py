@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[157]:
 
 # import methods
 
@@ -9,7 +9,7 @@ from methods import plot3d
 from methods import bin_spatial
 from methods import color_hist
 from methods import get_hog_features
-from methods import extract_features
+# from methods import extract_features
 from methods import slide_window
 
 import matplotlib.image as mpimg
@@ -29,6 +29,70 @@ from sklearn.model_selection import train_test_split
 # from sklearn.cross_validation import train_test_split
 
 
+# In[228]:
+
+## General Settings
+
+# settings for colorspace feature extraction
+cspace_val = 'RGB'
+spatial_size_val = (32, 32)
+
+# settings for histogram feature extraction
+hist_bins_val = 64
+hist_range_val = (0,256)
+
+# settings for hog feature extraction
+orient_val = 12
+pix_per_cell_val = 16
+cell_per_block_val = 4
+hog_channel_val = 0
+
+
+# In[229]:
+
+# Define a function to extract features from a list of images
+# Have this function call bin_spatial() and color_hist()
+# this function combines color, histogram and hog features extraction
+def extract_features(imgs, cspace='RGB', spatial_size=(32, 32),
+                        hist_bins=32, hist_range=(0, 256), orient=9, 
+                        pix_per_cell=8, cell_per_block=2, hog_channel=0):
+    # Create a list to append feature vectors to
+    features = []
+    # Iterate through the list of images
+    for file in imgs:
+        # Read in each one by one
+        #image = mpimg.imread(file)
+        image = cv2.imread(file) # reads a file into bgr values 0-255
+        
+        # apply color conversion if other than 'RGB'
+        if cspace != 'RGB':
+            if cspace == 'HSV':
+                feature_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+            elif cspace == 'LUV':
+                feature_image = cv2.cvtColor(image, cv2.COLOR_BGR2LUV)
+            elif cspace == 'HLS':
+                feature_image = cv2.cvtColor(image, cv2.COLOR_BGR2HLS)
+            elif cspace == 'YUV':
+                feature_image = cv2.cvtColor(image, cv2.COLOR_BGR2YUV)
+        else: 
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # convert to rgb
+            feature_image = np.copy(image)      
+        # Apply bin_spatial() to get spatial color features
+        spatial_features = bin_spatial(feature_image, size=spatial_size)
+        # Apply color_hist() also with a color space option now
+        hist_features = color_hist(feature_image, nbins=hist_bins, bins_range=hist_range)
+        # Call get_hog_features() with vis=False, feature_vec=True
+        hog_features = get_hog_features(feature_image[:,:,hog_channel], orient, 
+                        pix_per_cell, cell_per_block, vis=False, feature_vec=True)
+        # Append the new feature vector to the features list
+#         features.append(hog_features)
+        features.append(np.concatenate((spatial_features, hist_features, hog_features)))
+#         features.append(np.concatenate((hist_features, hog_features)))    
+        
+    # Return list of feature vectors
+    return features
+
+
 # # Method
 # * Perform a Histogram of Oriented Gradients (HOG) feature extraction on a labeled training set of images and train a classifier Linear SVM classifier
 # * Optionally, you can also apply a color transform and append binned color features, as well as histograms of color, to your HOG feature vector. 
@@ -39,7 +103,7 @@ from sklearn.model_selection import train_test_split
 
 # # Combined Color, Histogram and HOG Classification
 
-# In[32]:
+# In[230]:
 
 # Histogram of Oriented Gradients (HOG) feature extraction on a labeled training set of images and train a classifier Linear SVM classifier
 
@@ -59,24 +123,44 @@ for image in images:
 print('cars = ',len(cars))
 print('notcars = ',len(notcars))
 
-orient = 12
-pix_per_cell = 16
-cell_per_block = 4
-
 # experiment other color spaces like LUV, HLS
 
-car_features = extract_features(cars, cspace='RGB', spatial_size=(32, 32),
-                       hist_bins=32, hist_range=(0, 256))
-notcar_features = extract_features(notcars, cspace='RGB', spatial_size=(32, 32),
-                       hist_bins=32, hist_range=(0, 256))
+car_features = extract_features(cars, cspace=cspace_val, spatial_size=spatial_size_val,
+                       hist_bins=hist_bins_val, hist_range=hist_range_val, orient=orient_val, 
+                       pix_per_cell=pix_per_cell_val, cell_per_block=cell_per_block_val, hog_channel=hog_channel_val)
 
+print("Car features extracted")
+
+notcar_features = extract_features(notcars, cspace=cspace_val, spatial_size=spatial_size_val,
+                       hist_bins=hist_bins_val, hist_range=hist_range_val, orient=orient_val, 
+                       pix_per_cell=pix_per_cell_val, cell_per_block=cell_per_block_val, hog_channel=hog_channel_val)
+
+print("Other features extracted")
+
+
+# In[231]:
 
 # Create an array stack of feature vectors
 X = np.vstack((car_features, notcar_features)).astype(np.float64)                        
 # Fit a per-column scaler
 X_scaler = StandardScaler().fit(X)
+print("X_scaler ready")
+
+
+# In[232]:
+
+#save the model
+joblib.dump(X_scaler, 'X_scaler_model.pkl')
+
+
+# In[233]:
+
 # Apply the scaler to X - normalise data
 scaled_X = X_scaler.transform(X)
+print("Data normalised")
+
+
+# In[234]:
 
 # Define the labels vector
 y = np.hstack((np.ones(len(car_features)), np.zeros(len(notcar_features))))
@@ -84,7 +168,7 @@ y = np.hstack((np.ones(len(car_features)), np.zeros(len(notcar_features))))
 # Split up data into randomized training and test sets
 rand_state = np.random.randint(0, 100)
 X_train, X_test, y_train, y_test = train_test_split(
-   scaled_X, y, test_size=0.2, random_state=rand_state)
+    scaled_X, y, test_size=0.2, random_state=rand_state)
 
 # Use a linear SVC 
 svc = LinearSVC()
@@ -103,28 +187,35 @@ print("prediction",prediction)
 t2 = time.time()
 print(t2-t, 'Seconds to predict with SVC')
 
+# RGB test accuracy = 0.9788 and low number of false positives in test images
+# HSV test accuracy = 0.9777 but lots of false positives
+# HLS test accuracy = 0.9688 but lots of false positives
+# LUV test accuracy = 0.984  but lots of false positives
+# YUV test accuracy = 0.9786 but lots of false positives  
 
-# In[33]:
+
+# In[235]:
 
 print(svc)
 
 
-# In[34]:
+# In[236]:
 
 # save the model
 joblib.dump(svc, 'svc_model.pkl')
 
 
-# In[35]:
+# In[237]:
 
 # load the model
 svc = joblib.load('svc_model.pkl')
+X_scaler = joblib.load('X_scaler_model.pkl')
 print("Model loaded: \n\n",svc)
 
 
 # # Sliding Window Implementation
 
-# In[36]:
+# In[238]:
 
 def draw_rectangles(img,window_list,color= (255,255,255)):
     labeled_img = img.copy()
@@ -136,11 +227,11 @@ def draw_rectangles(img,window_list,color= (255,255,255)):
     return labeled_img
 
 
-# In[37]:
+# In[239]:
 
 # Implement a sliding-window technique and use your trained classifier to search for vehicles in images.
-img = cv2.imread('test_images/test5.jpg')
-img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
+img = cv2.imread('test_images/test1.jpg')
+# img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
 height, width, channels = img.shape
 print('height, width, channels = ',height, width, channels)
 
@@ -184,7 +275,7 @@ plt.imshow(img)
 plt.show()
 
 
-# In[38]:
+# In[240]:
 
 # Create the heat map
 CV_FILLED = -1
@@ -192,7 +283,19 @@ CV_FILLED = -1
 detected_img = img.copy()
 heat_img = np.zeros_like(img)
 heat_map = np.zeros_like(img)
-
+if cspace_val != 'RGB':
+    if cspace_val == 'HSV':
+        feature_image = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    elif cspace_val == 'LUV':
+        feature_image = cv2.cvtColor(img, cv2.COLOR_BGR2LUV)
+    elif cspace_val == 'HLS':
+        feature_image = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
+    elif cspace_val == 'YUV':
+        feature_image = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
+else: 
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # convert to rgb
+    feature_image = np.copy(img)     
+            
 for rectangle in rectangles:
     pt1 = rectangle[0]
     pt2 = rectangle[1]
@@ -201,21 +304,22 @@ for rectangle in rectangles:
     crop_img = cv2.resize(crop_img, size)
 
     img_features =[]
-    hog_channel=0
-    spatial_features = bin_spatial(crop_img, size=(32,32))
-    hist_features = color_hist(crop_img, nbins=32, bins_range=(0,256))
-    hog_features = get_hog_features(crop_img[:,:,hog_channel], orient=9, 
-                    pix_per_cell=8, cell_per_block=2, vis=False, feature_vec=True)
+    spatial_features = bin_spatial(crop_img, size=spatial_size_val)
+    hist_features = color_hist(crop_img, nbins=hist_bins_val, bins_range=hist_range_val)
+    hog_features = get_hog_features(crop_img[:,:,hog_channel_val], orient=orient_val, 
+                    pix_per_cell=pix_per_cell_val, cell_per_block=cell_per_block_val, vis=False, feature_vec=True)
+#     img_features.append(hog_features)
     img_features.append(np.concatenate((spatial_features, hist_features, hog_features)))
 #     img_features.append(np.concatenate((hist_features, hog_features)))
-    X = np.vstack((img_features)).astype(np.float64)                        
-    X = X.reshape(1, -1)
+    X = np.vstack((img_features)).astype(np.float64)
+
+#     X = X.reshape(1, -1)
     scaled_X = X_scaler.transform(X)
     prediction = svc.predict(scaled_X.reshape(1, -1))
     if prediction == 1:
         cv2.rectangle(detected_img, pt1, pt2, (255,255,255),thickness=4)
         cv2.rectangle(heat_img, pt1, pt2, color=(255,0,0), thickness=CV_FILLED)
-        heat_map = cv2.addWeighted(heat_map, 0.8, heat_img, 0.2, 0)
+        heat_map = cv2.addWeighted(heat_map, 0.95, heat_img, 0.05, 0)
 
 final_img = cv2.addWeighted(img, 0.5, heat_map, 0.5, 0)
 
@@ -229,6 +333,11 @@ ax3.set_title('Heat map')
 ax4.imshow(final_img)
 ax4.set_title('Final image')
 plt.show()
+
+
+# In[ ]:
+
+
 
 
 # In[ ]:

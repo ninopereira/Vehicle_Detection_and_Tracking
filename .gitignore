@@ -1,3 +1,7 @@
+examples/
+*.zip
+other_resources/
+project_video.mp4
 vehicles/
 non-vehicles/
 *~
