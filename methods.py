@@ -107,18 +107,22 @@ def extract_features(imgs, cspace='RGB', spatial_size=(32, 32),
     # Iterate through the list of images
     for file in imgs:
         # Read in each one by one
-        image = mpimg.imread(file)
+        #image = mpimg.imread(file)
+        image = cv2.imread(file) # reads a file into bgr values 0-255
+        
         # apply color conversion if other than 'RGB'
         if cspace != 'RGB':
             if cspace == 'HSV':
-                feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+                feature_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
             elif cspace == 'LUV':
-                feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2LUV)
+                feature_image = cv2.cvtColor(image, cv2.COLOR_BGR2LUV)
             elif cspace == 'HLS':
-                feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
+                feature_image = cv2.cvtColor(image, cv2.COLOR_BGR2HLS)
             elif cspace == 'YUV':
-                feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2YUV)
-        else: feature_image = np.copy(image)      
+                feature_image = cv2.cvtColor(image, cv2.COLOR_BGR2YUV)
+        else: 
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # convert to rgb
+            feature_image = np.copy(image)      
         # Apply bin_spatial() to get spatial color features
         spatial_features = bin_spatial(feature_image, size=spatial_size)
         # Apply color_hist() also with a color space option now
@@ -128,20 +132,19 @@ def extract_features(imgs, cspace='RGB', spatial_size=(32, 32),
                         pix_per_cell, cell_per_block, vis=False, feature_vec=True)
         # Append the new feature vector to the features list
         features.append(np.concatenate((spatial_features, hist_features, hog_features)))
-#         features.append(np.concatenate((hist_features, hog_features)))    
         
     # Return list of feature vectors
     return features
 
 
-# In[7]:
+# In[3]:
 
 # Define a function that takes an image,
 # start and stop positions in both x and y, 
 # window size (x and y dimensions),  
 # and overlap fraction (for both x and y)
 def slide_window(img, x_start_stop=[None, None], y_start_stop=[None, None], 
-                    xy_window=(64, 64), xy_overlap=(0.5, 0.5)):
+                    xy_window=(64, 64), xy_overlap=(0.5, 0.5),max_y=780):
     height, width, channels = img.shape
     # If x and/or y start/stop positions not defined, set to image size
     if x_start_stop[0] == None:
@@ -175,7 +178,7 @@ def slide_window(img, x_start_stop=[None, None], y_start_stop=[None, None],
             starty = int(ys*ny_pix_per_step + y_start_stop[0])
             endy = int(starty + xy_window[1])
             # Append window position to list
-            if endy<height and endx < width:
+            if endy<height and endx < width and endy<max_y:
                 window_list.append(((startx, starty), (endx, endy)))
     # Return the list of windows
     return window_list

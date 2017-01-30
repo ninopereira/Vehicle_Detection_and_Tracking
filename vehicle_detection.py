@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[157]:
+# In[1]:
 
 # import methods
 
@@ -9,7 +9,7 @@ from methods import plot3d
 from methods import bin_spatial
 from methods import color_hist
 from methods import get_hog_features
-# from methods import extract_features
+from methods import extract_features
 from methods import slide_window
 
 import matplotlib.image as mpimg
@@ -29,7 +29,7 @@ from sklearn.model_selection import train_test_split
 # from sklearn.cross_validation import train_test_split
 
 
-# In[228]:
+# In[2]:
 
 ## General Settings
 
@@ -48,49 +48,32 @@ cell_per_block_val = 4
 hog_channel_val = 0
 
 
-# In[229]:
+# In[92]:
 
-# Define a function to extract features from a list of images
-# Have this function call bin_spatial() and color_hist()
-# this function combines color, histogram and hog features extraction
-def extract_features(imgs, cspace='RGB', spatial_size=(32, 32),
-                        hist_bins=32, hist_range=(0, 256), orient=9, 
-                        pix_per_cell=8, cell_per_block=2, hog_channel=0):
-    # Create a list to append feature vectors to
-    features = []
-    # Iterate through the list of images
-    for file in imgs:
-        # Read in each one by one
-        #image = mpimg.imread(file)
-        image = cv2.imread(file) # reads a file into bgr values 0-255
+# crop image to a given region of interes defined by the vertices
+def region_of_interest(img, vertices, color_max_value = 255):
+    """
+    Applies an image mask.
+    
+    Only keeps the region of the image defined by the polygon
+    formed from `vertices`. The rest of the image is set to black.
+    """
+    #defining a blank mask to start with
+    mask = np.zeros_like(img)   
+    
+    #defining a 3 channel or 1 channel color to fill the mask with depending on the input image
+    if len(img.shape) > 2:
+        channel_count = img.shape[2]  # i.e. 3 or 4 depending on your image
+        ignore_mask_color = (color_max_value,) * channel_count
+    else:
+        ignore_mask_color = color_max_value
         
-        # apply color conversion if other than 'RGB'
-        if cspace != 'RGB':
-            if cspace == 'HSV':
-                feature_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-            elif cspace == 'LUV':
-                feature_image = cv2.cvtColor(image, cv2.COLOR_BGR2LUV)
-            elif cspace == 'HLS':
-                feature_image = cv2.cvtColor(image, cv2.COLOR_BGR2HLS)
-            elif cspace == 'YUV':
-                feature_image = cv2.cvtColor(image, cv2.COLOR_BGR2YUV)
-        else: 
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # convert to rgb
-            feature_image = np.copy(image)      
-        # Apply bin_spatial() to get spatial color features
-        spatial_features = bin_spatial(feature_image, size=spatial_size)
-        # Apply color_hist() also with a color space option now
-        hist_features = color_hist(feature_image, nbins=hist_bins, bins_range=hist_range)
-        # Call get_hog_features() with vis=False, feature_vec=True
-        hog_features = get_hog_features(feature_image[:,:,hog_channel], orient, 
-                        pix_per_cell, cell_per_block, vis=False, feature_vec=True)
-        # Append the new feature vector to the features list
-#         features.append(hog_features)
-        features.append(np.concatenate((spatial_features, hist_features, hog_features)))
-#         features.append(np.concatenate((hist_features, hog_features)))    
-        
-    # Return list of feature vectors
-    return features
+    #filling pixels inside the polygon defined by "vertices" with the fill color    
+    cv2.fillPoly(mask, vertices, ignore_mask_color)
+    
+    #returning the image only where mask pixels are nonzero
+    masked_image = cv2.bitwise_and(img, mask)
+    return masked_image
 
 
 # # Method
@@ -205,7 +188,7 @@ print(svc)
 joblib.dump(svc, 'svc_model.pkl')
 
 
-# In[237]:
+# In[3]:
 
 # load the model
 svc = joblib.load('svc_model.pkl')
@@ -215,7 +198,7 @@ print("Model loaded: \n\n",svc)
 
 # # Sliding Window Implementation
 
-# In[238]:
+# In[4]:
 
 def draw_rectangles(img,window_list,color= (255,255,255)):
     labeled_img = img.copy()
@@ -227,7 +210,7 @@ def draw_rectangles(img,window_list,color= (255,255,255)):
     return labeled_img
 
 
-# In[239]:
+# In[8]:
 
 # Implement a sliding-window technique and use your trained classifier to search for vehicles in images.
 img = cv2.imread('test_images/test1.jpg')
@@ -235,6 +218,9 @@ img = cv2.imread('test_images/test1.jpg')
 height, width, channels = img.shape
 print('height, width, channels = ',height, width, channels)
 
+# vertices = np.array([[(0,0.90*height),(0,0.55*height),(width, 0.55*height), (width, 0.90*height)]], dtype=np.int32);
+# img = region_of_interest(img, vertices, color_max_value=255);
+        
 window_list=();
 
 step_h = 32
@@ -255,7 +241,7 @@ for i in range(len(size_vec)):
     size = size_vec[i]
     overlap = overlap_vec[i]
     window_list = slide_window(img, x_start_stop=[0, width+size], y_start_stop=[y_val,y_val+4*size], 
-                    xy_window=(size, size), xy_overlap=(overlap,overlap))
+                    xy_window=(size, size), xy_overlap=(overlap,overlap),max_y=height*0.9)
     rectangles.extend(window_list)
     
 # while y_val<height:
@@ -275,13 +261,13 @@ plt.imshow(img)
 plt.show()
 
 
-# In[240]:
+# In[16]:
 
 # Create the heat map
 CV_FILLED = -1
 
 detected_img = img.copy()
-heat_img = np.zeros_like(img)
+
 heat_map = np.zeros_like(img)
 if cspace_val != 'RGB':
     if cspace_val == 'HSV':
@@ -297,6 +283,7 @@ else:
     feature_image = np.copy(img)     
             
 for rectangle in rectangles:
+    heat_img = np.zeros_like(img)
     pt1 = rectangle[0]
     pt2 = rectangle[1]
     crop_img = img[pt1[1]:pt2[1], pt1[0]:pt2[0]]
@@ -319,8 +306,23 @@ for rectangle in rectangles:
     if prediction == 1:
         cv2.rectangle(detected_img, pt1, pt2, (255,255,255),thickness=4)
         cv2.rectangle(heat_img, pt1, pt2, color=(255,0,0), thickness=CV_FILLED)
-        heat_map = cv2.addWeighted(heat_map, 0.95, heat_img, 0.05, 0)
+        heat_map = cv2.addWeighted(heat_map, 0.6, heat_img, 0.4, 0) # I can't do this, it's wrong. 
+        #It dissipates previously detected rectangles
 
+plt.imshow(heat_map)
+plt.show()
+
+
+# In[17]:
+
+red_channel = heat_map[:,:,0]
+print("max:",np.amax(red_channel))
+th = np.amax(red_channel)*0.75 # define threshold
+print("th:",th)
+filt_red_ch = np.zeros_like(red_channel)
+filt_red_ch[red_channel>=th]=255
+
+heat_map[:,:,0]=filt_red_ch
 final_img = cv2.addWeighted(img, 0.5, heat_map, 0.5, 0)
 
 f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
@@ -334,10 +336,8 @@ ax4.imshow(final_img)
 ax4.set_title('Final image')
 plt.show()
 
-
-# In[ ]:
-
-
+# plt.imshow(filt_red_ch,cmap='gray')
+# plt.show()
 
 
 # In[ ]:
