@@ -188,6 +188,14 @@ print(svc)
 joblib.dump(svc, 'svc_model.pkl')
 
 
+# # ---------------------------------
+# # LOAD the Models
+# # ---------------------------------
+# 
+# 'svc_model.pkl'
+# 
+# 'X_scaler_model.pkl'
+
 # In[3]:
 
 # load the model
@@ -210,16 +218,13 @@ def draw_rectangles(img,window_list,color= (255,255,255)):
     return labeled_img
 
 
-# In[8]:
+# In[41]:
 
 # Implement a sliding-window technique and use your trained classifier to search for vehicles in images.
-img = cv2.imread('test_images/test1.jpg')
+img = cv2.imread('test_images/test6.jpg')
 # img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
 height, width, channels = img.shape
 print('height, width, channels = ',height, width, channels)
-
-# vertices = np.array([[(0,0.90*height),(0,0.55*height),(width, 0.55*height), (width, 0.90*height)]], dtype=np.int32);
-# img = region_of_interest(img, vertices, color_max_value=255);
         
 window_list=();
 
@@ -243,15 +248,6 @@ for i in range(len(size_vec)):
     window_list = slide_window(img, x_start_stop=[0, width+size], y_start_stop=[y_val,y_val+4*size], 
                     xy_window=(size, size), xy_overlap=(overlap,overlap),max_y=height*0.9)
     rectangles.extend(window_list)
-    
-# while y_val<height:
-# #     size_of_sq = int(500000 * (y_val/height) ** 16)
-#     size_of_sq = int(30000 * (y_val/height) ** 8)
-#     window_list = slide_window(img, x_start_stop=[0, width+size_of_sq], y_start_stop=[y_val,y_val+2*size_of_sq], 
-#                     xy_window=(size_of_sq, size_of_sq), xy_overlap=(overlap,overlap))
-#     rectangles.extend(window_list)
-
-#     y_val = y_val + (1-overlap)*size_of_sq
 
 print("num rectangles = ", len(rectangles))
 labeled_img = draw_rectangles(img,rectangles)
@@ -261,7 +257,7 @@ plt.imshow(img)
 plt.show()
 
 
-# In[16]:
+# In[42]:
 
 # Create the heat map
 CV_FILLED = -1
@@ -295,36 +291,35 @@ for rectangle in rectangles:
     hist_features = color_hist(crop_img, nbins=hist_bins_val, bins_range=hist_range_val)
     hog_features = get_hog_features(crop_img[:,:,hog_channel_val], orient=orient_val, 
                     pix_per_cell=pix_per_cell_val, cell_per_block=cell_per_block_val, vis=False, feature_vec=True)
-#     img_features.append(hog_features)
+
     img_features.append(np.concatenate((spatial_features, hist_features, hog_features)))
-#     img_features.append(np.concatenate((hist_features, hog_features)))
     X = np.vstack((img_features)).astype(np.float64)
 
-#     X = X.reshape(1, -1)
     scaled_X = X_scaler.transform(X)
     prediction = svc.predict(scaled_X.reshape(1, -1))
     if prediction == 1:
         cv2.rectangle(detected_img, pt1, pt2, (255,255,255),thickness=4)
-        cv2.rectangle(heat_img, pt1, pt2, color=(255,0,0), thickness=CV_FILLED)
-        heat_map = cv2.addWeighted(heat_map, 0.6, heat_img, 0.4, 0) # I can't do this, it's wrong. 
-        #It dissipates previously detected rectangles
+        cv2.rectangle(heat_img, pt1, pt2, color=(20,0,0), thickness=CV_FILLED)
+        heat_map = cv2.add(heat_map, heat_img)
 
 plt.imshow(heat_map)
 plt.show()
 
 
-# In[17]:
+# In[43]:
 
 red_channel = heat_map[:,:,0]
 print("max:",np.amax(red_channel))
-th = np.amax(red_channel)*0.75 # define threshold
+th = np.amax(red_channel)*0.5 # define threshold
 print("th:",th)
 filt_red_ch = np.zeros_like(red_channel)
-filt_red_ch[red_channel>=th]=255
-
-heat_map[:,:,0]=filt_red_ch
-final_img = cv2.addWeighted(img, 0.5, heat_map, 0.5, 0)
-
+if np.amax(red_channel)>0:
+    filt_red_ch[red_channel>=th]=255
+    heat_map[:,:,0]=filt_red_ch
+    final_img = cv2.addWeighted(img, 0.5, heat_map, 0.5, 0)
+else:
+    final_img = np.copy(img)
+    
 f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
 ax1.imshow(img)
 ax1.set_title('original image')
@@ -338,6 +333,123 @@ plt.show()
 
 # plt.imshow(filt_red_ch,cmap='gray')
 # plt.show()
+
+
+# In[ ]:
+
+int main()
+{
+    cv::Mat input = cv::imread("../inputData/RotatedRect.png");
+
+    // convert to grayscale (you could load as grayscale instead)
+    cv::Mat gray;
+    cv::cvtColor(input,gray, CV_BGR2GRAY);
+
+    // compute mask (you could use a simple threshold if the image is always as good as the one you provided)
+    cv::Mat mask;
+    cv::threshold(gray, mask, 0, 255, CV_THRESH_BINARY_INV | CV_THRESH_OTSU);
+
+    // find contours (if always so easy to segment as your image, you could just add the black/rect pixels to a vector)
+    std::vector<std::vector<cv::Point>> contours;
+    std::vector<cv::Vec4i> hierarchy;
+    cv::findContours(mask,contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
+
+    /// Draw contours and find biggest contour (if there are other contours in the image, we assume the biggest one is the desired rect)
+    // drawing here is only for demonstration!
+    int biggestContourIdx = -1;
+    float biggestContourArea = 0;
+    cv::Mat drawing = cv::Mat::zeros( mask.size(), CV_8UC3 );
+    for( int i = 0; i< contours.size(); i++ )
+    {
+        cv::Scalar color = cv::Scalar(0, 100, 0);
+        drawContours( drawing, contours, i, color, 1, 8, hierarchy, 0, cv::Point() );
+
+        float ctArea= cv::contourArea(contours[i]);
+        if(ctArea > biggestContourArea)
+        {
+            biggestContourArea = ctArea;
+            biggestContourIdx = i;
+        }
+    }
+
+    (/, if, no, contour, found)
+    if(biggestContourIdx < 0)
+    {
+        std::cout << "no contour found" << std::endl;
+        return 1;
+    }
+
+    (/, compute, the, rotated, bounding, rect, of, the, biggest, contour!, (this, is, the, part, that, does, what, you, want/need))
+    cv::RotatedRect boundingBox = cv::minAreaRect(contours[biggestContourIdx]);
+    (/, one, thing, to, remark:, this, will, compute, the, OUTER, boundary, box,, so, maybe, you, have, to, erode/dilate)
+    (/if, you, want, something, between, the, ragged, lines)
+
+
+
+    (/, draw, the, rotated, rect)
+    cv::Point2f corners[4];
+    boundingBox.points(corners);
+    cv::line(drawing, corners[0], corners[1], cv::Scalar(255,255,255));
+    cv::line(drawing, corners[1], corners[2], cv::Scalar(255,255,255));
+    cv::line(drawing, corners[2], corners[3], cv::Scalar(255,255,255));
+    cv::line(drawing, corners[3], corners[0], cv::Scalar(255,255,255));
+
+    (/, display)
+    cv::imshow("input", input);
+    cv::imshow("drawing", drawing);
+    cv::waitKey(0);
+
+    cv::imwrite("rotatedRect.png",drawing);
+
+    return 0;
+}
+
+
+# In[ ]:
+
+cv::findContours(mask,contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
+float ctArea= cv::contourArea(contours[i]);
+
+for( int i = 0; i< contours.size(); i++ )
+    {
+        cv::Scalar color = cv::Scalar(0, 100, 0);
+        drawContours( drawing, contours, i, color, 1, 8, hierarchy, 0, cv::Point() );
+
+        float ctArea= cv::contourArea(contours[i]);
+        if(ctArea > biggestContourArea)
+        {
+            biggestContourArea = ctArea;
+            biggestContourIdx = i;
+        }
+    }
+cv::RotatedRect boundingBox = cv::minAreaRect(contours[biggestContourIdx]);
+                
+                    (/, draw, the, rotated, rect)
+    cv::Point2f corners[4];
+    boundingBox.points(corners);
+    cv::line(drawing, corners[0], corners[1], cv::Scalar(255,255,255));
+    cv::line(drawing, corners[1], corners[2], cv::Scalar(255,255,255));
+    cv::line(drawing, corners[2], corners[3], cv::Scalar(255,255,255));
+    cv::line(drawing, corners[3], corners[0], cv::Scalar(255,255,255));
+
+
+# In[112]:
+
+imgray = heat_map[:,:,0]#cv2.cvtColor(heat_map,cv2.COLOR_BGR2GRAY)
+ret,thresh = cv2.threshold(imgray,60,255,0)
+im2, contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+print(len(contours))
+print(contours)
+print(contours[:][0][1][0][1])
+
+cv2.drawContours(img, contours, -1, (0,255,0), 3)
+plt.imshow(im2)
+plt.show()
+
+
+# In[ ]:
+
+
 
 
 # In[ ]:
