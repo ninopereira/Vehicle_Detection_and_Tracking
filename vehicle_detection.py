@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[158]:
+# In[85]:
 
 # import methods
 
@@ -34,12 +34,12 @@ from sklearn.model_selection import train_test_split
 # from sklearn.cross_validation import train_test_split
 
 
-# In[ ]:
+# In[86]:
 
 ## General Settings
 
 # settings for colorspace feature extraction
-cspace_val = 'RGB'
+cspace_val = 'RGB'#'RGB'
 spatial_size_val = (32, 32)
 
 # settings for histogram feature extraction
@@ -47,13 +47,16 @@ hist_bins_val = 64
 hist_range_val = (0,256)
 
 # settings for hog feature extraction
-orient_val = 12
-pix_per_cell_val = 16
-cell_per_block_val = 4
-hog_channel_val = 0
+orient_val = 9
+pix_per_cell_val = 8
+cell_per_block_val = 2
+# orient_val = 12
+# pix_per_cell_val = 16
+# cell_per_block_val = 4
+hog_channel_val = 2
 
 
-# In[92]:
+# In[87]:
 
 # crop image to a given region of interes defined by the vertices
 def region_of_interest(img, vertices, color_max_value = 255):
@@ -91,7 +94,7 @@ def region_of_interest(img, vertices, color_max_value = 255):
 
 # # Combined Color, Histogram and HOG Classification
 
-# In[230]:
+# In[88]:
 
 # Histogram of Oriented Gradients (HOG) feature extraction on a labeled training set of images and train a classifier Linear SVM classifier
 
@@ -126,7 +129,7 @@ notcar_features = extract_features(notcars, cspace=cspace_val, spatial_size=spat
 print("Other features extracted")
 
 
-# In[231]:
+# In[89]:
 
 # Create an array stack of feature vectors
 X = np.vstack((car_features, notcar_features)).astype(np.float64)                        
@@ -135,20 +138,20 @@ X_scaler = StandardScaler().fit(X)
 print("X_scaler ready")
 
 
-# In[232]:
+# In[90]:
 
 #save the model
 joblib.dump(X_scaler, 'X_scaler_model.pkl')
 
 
-# In[233]:
+# In[91]:
 
 # Apply the scaler to X - normalise data
 scaled_X = X_scaler.transform(X)
 print("Data normalised")
 
 
-# In[234]:
+# In[92]:
 
 # Define the labels vector
 y = np.hstack((np.ones(len(car_features)), np.zeros(len(notcar_features))))
@@ -182,12 +185,12 @@ print(t2-t, 'Seconds to predict with SVC')
 # YUV test accuracy = 0.9786 but lots of false positives  
 
 
-# In[235]:
+# In[93]:
 
 print(svc)
 
 
-# In[236]:
+# In[94]:
 
 # save the model
 joblib.dump(svc, 'svc_model.pkl')
@@ -201,7 +204,7 @@ joblib.dump(svc, 'svc_model.pkl')
 # 
 # 'X_scaler_model.pkl'
 
-# In[3]:
+# In[95]:
 
 # load the model
 svc = joblib.load('svc_model.pkl')
@@ -211,7 +214,7 @@ print("Model loaded: \n\n",svc)
 
 # # Sliding Window Implementation
 
-# In[109]:
+# In[96]:
 
 def draw_rectangles(img,window_list,color= (255,255,255)):
     labeled_img = img.copy()
@@ -223,10 +226,10 @@ def draw_rectangles(img,window_list,color= (255,255,255)):
     return labeled_img
 
 
-# In[144]:
+# In[97]:
 
 # create a list of rectangles with different sizes across the lower part of the image for searching cars
-def create_list_rectangles(img,overlap = 0.4):
+def create_list_rectangles(img,overlap = 0.75):
     
     height, width, channels = img.shape
 #     print('height, width, channels = ',height, width, channels)
@@ -254,12 +257,13 @@ def create_list_rectangles(img,overlap = 0.4):
     return rectangles
 
 
-# In[145]:
+# In[98]:
 
 # Create the heat map
 def get_heat_map(img,cspace_val,rectangles,spatial_size_val,hist_bins_val,
                 hist_range_val,hog_channel_val,orient_val,pix_per_cell_val,cell_per_block_val):
     
+    heat_increment = 10
     CV_FILLED = -1
     heat_map = np.zeros_like(img)
     if cspace_val != 'RGB':
@@ -291,16 +295,17 @@ def get_heat_map(img,cspace_val,rectangles,spatial_size_val,hist_bins_val,
 
         img_features.append(np.concatenate((spatial_features, hist_features, hog_features)))
         X = np.vstack((img_features)).astype(np.float64)
+        X = np.array(X).reshape(1, -1)
 
         scaled_X = X_scaler.transform(X)
         prediction = svc.predict(scaled_X.reshape(1, -1))
         if prediction == 1:
-            cv2.rectangle(heat_img, pt1, pt2, color=(20,0,0), thickness=CV_FILLED)
+            cv2.rectangle(heat_img, pt1, pt2, color=(heat_increment,0,0), thickness=CV_FILLED)
             heat_map = cv2.add(heat_map, heat_img)
     return heat_map
 
 
-# In[146]:
+# In[99]:
 
 # apply filter to the heat_map
 # Note: th_ratio should be a ratio (0-1)
@@ -318,7 +323,7 @@ def filter_heat_map(heat_map, th_ratio=0.5):
     return filt_heat_map
 
 
-# In[147]:
+# In[100]:
 
 # computes positions and bounding rectangles identifying the location of detected vehicles
 def get_detected(heat_map,area_th = 20):
@@ -345,13 +350,13 @@ def get_detected(heat_map,area_th = 20):
     return detected_car_pos,detected_car_rectangles
 
 
-# In[163]:
+# In[109]:
 
 def process_image(img,debug=0):
     
     ################################################################################
     #these settings have to be made global or loaded via other way
-    cspace_val = 'RGB'
+    cspace_val = 'RGB'#'RGB'
     spatial_size_val = (32, 32)
 
     # settings for histogram feature extraction
@@ -359,20 +364,23 @@ def process_image(img,debug=0):
     hist_range_val = (0,256)
 
     # settings for hog feature extraction
-    orient_val = 12
-    pix_per_cell_val = 16
-    cell_per_block_val = 4
-    hog_channel_val = 0
+    orient_val = 9
+    pix_per_cell_val = 8
+    cell_per_block_val = 2
+    # orient_val = 12
+    # pix_per_cell_val = 16
+    # cell_per_block_val = 4
+    hog_channel_val = 2
     #################################################################################
     
-    rectangles = create_list_rectangles(img,overlap = 0.4)
+    rectangles = create_list_rectangles(img,overlap = 0.5)
 
     heat_map = get_heat_map(img,cspace_val,rectangles,spatial_size_val,hist_bins_val,
                     hist_range_val,hog_channel_val,orient_val,pix_per_cell_val,cell_per_block_val)
 
-    filtered_heat_map = filter_heat_map(heat_map,th_ratio=0.5)
+    filtered_heat_map = filter_heat_map(heat_map,th_ratio=0.1)
 
-    detected_car_pos,detected_car_rectangles = get_detected(filtered_heat_map,area_th = 500)
+    detected_car_pos,detected_car_rectangles = get_detected(filtered_heat_map,area_th = 1000)
     
     detected_cars_img = draw_rectangles(img,detected_car_rectangles,color= (255,255,255))
     if debug:
@@ -389,7 +397,7 @@ def process_image(img,debug=0):
         ax3.set_title('Heat map')
         ax4.imshow(filtered_heat_map)
         ax4.set_title('Filtered heat_map')
-        ax5.imshow(detected_cars)
+        ax5.imshow(detected_cars_img)
         ax5.set_title('Detected cars')
         ax1.axis('off');
         ax2.axis('off');
@@ -406,7 +414,7 @@ def process_image(img,debug=0):
 #         process_image.count = 0
 
 
-# In[161]:
+# In[111]:
 
 # pipeline
 # Implement a sliding-window technique and use your trained classifier to search for vehicles in images.
@@ -420,15 +428,13 @@ img = cv2.imread('test_images/test1.jpg') # two cars, black and white
 process_image(img,debug=1);
 
 
-
-
-# In[152]:
+# In[74]:
 
 # get an image from video and plug it in the pipeline
 # the pipeline should accept a 
 
 
-# In[164]:
+# In[112]:
 
 video_output = 'project_video_output.mp4';
 clip1 = VideoFileClip("project_video.mp4");
