@@ -206,7 +206,7 @@ print("Model loaded: \n\n",svc)
 
 # # Sliding Window Implementation
 
-# In[4]:
+# In[109]:
 
 def draw_rectangles(img,window_list,color= (255,255,255)):
     labeled_img = img.copy()
@@ -218,174 +218,179 @@ def draw_rectangles(img,window_list,color= (255,255,255)):
     return labeled_img
 
 
-# In[60]:
+# In[144]:
 
-# Implement a sliding-window technique and use your trained classifier to search for vehicles in images.
-img = cv2.imread('test_images/test6.jpg') # two cars, black and white
-# img = cv2.imread('test_images/test5.jpg') # two cars, black and white
-# img = cv2.imread('test_images/test4.jpg') # two cars, black and white
-# img = cv2.imread('test_images/test3.jpg') # two cars, black and white
-# img = cv2.imread('test_images/test2.jpg') # no cars
-# img = cv2.imread('test_images/test1.jpg') # two cars, black and white
-# img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
-height, width, channels = img.shape
-print('height, width, channels = ',height, width, channels)
-        
-window_list=();
+# create a list of rectangles with different sizes across the lower part of the image for searching cars
+def create_list_rectangles(img,overlap = 0.4):
+    
+    height, width, channels = img.shape
+#     print('height, width, channels = ',height, width, channels)
+    window_list=();
+    rectangles = []
 
-step_h = 32
-start_h = step_h#int(height/4)
-stop_h = height 
-size_of_sq = int(256 * (1/height))
-original_y_val = int(9*height/16) #int(6*height/11)
-# original_y_val = int(6*height/12)
-y_val = original_y_val
-overlap = 0.5
-rectangles = []
+    step_h = 32
+    start_h = step_h#int(height/4)
+    stop_h = height 
+    size_of_sq = int(256 * (1/height))
+    original_y_val = int(9*height/16) #int(6*height/11)
+    # original_y_val = int(6*height/12)
+    y_val = original_y_val    
 
-size_vec = [64, 96, 128, 160]
-overlap_vec = [0, 0.5, 0.65, 0.8]
-# size_vec = [160]
-# overlap_vec = [0.8]
-for i in range(len(size_vec)):
-    size = size_vec[i]
-    overlap = overlap_vec[i]
-    window_list = slide_window(img, x_start_stop=[0, width+size], y_start_stop=[y_val,y_val+4*size], 
-                    xy_window=(size, size), xy_overlap=(overlap,overlap),max_y=height*0.9)
-    rectangles.extend(window_list)
-
-print("num rectangles = ", len(rectangles))
-labeled_img = draw_rectangles(img,rectangles)
-plt.imshow(labeled_img)
-plt.show()
-plt.imshow(img)
-plt.show()
+    size_vec = [64, 96, 128, 160]
+    overlap_vec = [0, 0.5, 0.65, 0.8]
+    # size_vec = [160]
+    # overlap_vec = [0.8]
+    for i in range(len(size_vec)):
+        size = size_vec[i]
+        overlap = overlap_vec[i]
+        window_list = slide_window(img, x_start_stop=[0, width+size], y_start_stop=[y_val,y_val+4*size], 
+                        xy_window=(size, size), xy_overlap=(overlap,overlap),max_y=height*0.9)
+        rectangles.extend(window_list)
+    return rectangles
 
 
-# In[61]:
+# In[145]:
 
 # Create the heat map
-CV_FILLED = -1
-
-detected_img = img.copy()
-
-heat_map = np.zeros_like(img)
-if cspace_val != 'RGB':
-    if cspace_val == 'HSV':
-        feature_image = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    elif cspace_val == 'LUV':
-        feature_image = cv2.cvtColor(img, cv2.COLOR_BGR2LUV)
-    elif cspace_val == 'HLS':
-        feature_image = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
-    elif cspace_val == 'YUV':
-        feature_image = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
-else: 
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # convert to rgb
-    feature_image = np.copy(img)     
-            
-for rectangle in rectangles:
-    heat_img = np.zeros_like(img)
-    pt1 = rectangle[0]
-    pt2 = rectangle[1]
-    crop_img = img[pt1[1]:pt2[1], pt1[0]:pt2[0]]
-    size = (64,64)
-    crop_img = cv2.resize(crop_img, size)
-
-    img_features =[]
-    spatial_features = bin_spatial(crop_img, size=spatial_size_val)
-    hist_features = color_hist(crop_img, nbins=hist_bins_val, bins_range=hist_range_val)
-    hog_features = get_hog_features(crop_img[:,:,hog_channel_val], orient=orient_val, 
-                    pix_per_cell=pix_per_cell_val, cell_per_block=cell_per_block_val, vis=False, feature_vec=True)
-
-    img_features.append(np.concatenate((spatial_features, hist_features, hog_features)))
-    X = np.vstack((img_features)).astype(np.float64)
-
-    scaled_X = X_scaler.transform(X)
-    prediction = svc.predict(scaled_X.reshape(1, -1))
-    if prediction == 1:
-        cv2.rectangle(detected_img, pt1, pt2, (255,255,255),thickness=4)
-        cv2.rectangle(heat_img, pt1, pt2, color=(20,0,0), thickness=CV_FILLED)
-        heat_map = cv2.add(heat_map, heat_img)
-
-plt.imshow(heat_map)
-plt.show()
-
-
-# In[62]:
-
-red_channel = heat_map[:,:,0]
-print("max:",np.amax(red_channel))
-th = np.amax(red_channel)*0.5 # define threshold
-print("th:",th)
-filt_red_ch = np.zeros_like(red_channel)
-if np.amax(red_channel)>0:
-    filt_red_ch[red_channel>=th]=255
-    heat_map[:,:,0]=filt_red_ch
-    final_img = cv2.addWeighted(img, 0.5, heat_map, 0.5, 0)
-else:
-    final_img = np.copy(img)
+def get_heat_map(img,cspace_val,rectangles,spatial_size_val,hist_bins_val,
+                hist_range_val,hog_channel_val,orient_val,pix_per_cell_val,cell_per_block_val):
     
-f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
+    CV_FILLED = -1
+    heat_map = np.zeros_like(img)
+    if cspace_val != 'RGB':
+        if cspace_val == 'HSV':
+            feature_image = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        elif cspace_val == 'LUV':
+            feature_image = cv2.cvtColor(img, cv2.COLOR_BGR2LUV)
+        elif cspace_val == 'HLS':
+            feature_image = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
+        elif cspace_val == 'YUV':
+            feature_image = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
+    else: 
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # convert to rgb
+        feature_image = np.copy(img)     
+
+    for rectangle in rectangles:
+        heat_img = np.zeros_like(img)
+        pt1 = rectangle[0]
+        pt2 = rectangle[1]
+        crop_img = img[pt1[1]:pt2[1], pt1[0]:pt2[0]]
+        size = (64,64)
+        crop_img = cv2.resize(crop_img, size)
+
+        img_features =[]
+        spatial_features = bin_spatial(crop_img, size=spatial_size_val)
+        hist_features = color_hist(crop_img, nbins=hist_bins_val, bins_range=hist_range_val)
+        hog_features = get_hog_features(crop_img[:,:,hog_channel_val], orient=orient_val, 
+                        pix_per_cell=pix_per_cell_val, cell_per_block=cell_per_block_val, vis=False, feature_vec=True)
+
+        img_features.append(np.concatenate((spatial_features, hist_features, hog_features)))
+        X = np.vstack((img_features)).astype(np.float64)
+
+        scaled_X = X_scaler.transform(X)
+        prediction = svc.predict(scaled_X.reshape(1, -1))
+        if prediction == 1:
+            cv2.rectangle(heat_img, pt1, pt2, color=(20,0,0), thickness=CV_FILLED)
+            heat_map = cv2.add(heat_map, heat_img)
+    return heat_map
+
+
+# In[146]:
+
+# apply filter to the heat_map
+# Note: th_ratio should be a ratio (0-1)
+# It will be used with respect to the maximum pixel value in the image
+def filter_heat_map(heat_map, th_ratio=0.5):
+    red_channel = np.copy(heat_map[:,:,0])
+#     print("max:",np.amax(red_channel))
+    th = np.amax(red_channel)*th_ratio # define threshold
+#     print("th:",th)
+    filt_heat_map = np.zeros_like(heat_map)
+    if np.amax(red_channel)>0:
+        red_channel[red_channel>=th]=255
+        red_channel[red_channel<th]=0
+        filt_heat_map[:,:,0]=red_channel
+    return filt_heat_map
+
+
+# In[147]:
+
+# computes positions and bounding rectangles identifying the location of detected vehicles
+def get_detected(heat_map,area_th = 20):
+     # define a threshold for minimum area required to be a positive detection
+    imgray = heat_map[:,:,0]#cv2.cvtColor(heat_map,cv2.COLOR_BGR2GRAY)
+    ret,thresh = cv2.threshold(imgray,60,255,0)
+    im2, contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+#     im2, contours, hierarchy = cv2.findContours(heat_map[:,:,0],cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+    detected_car_pos = [];
+    detected_car_rectangles = [];
+    for contour in contours:
+        area = cv2.contourArea(contour)
+#         print(area)
+        if area>area_th:
+            x,y,w,h = cv2.boundingRect(contour)
+            M = cv2.moments(contour)
+            # calculate image centroid
+            cx = int(M['m10']/M['m00'])
+            cy = int(M['m01']/M['m00'])
+            pt1 = (x,y)
+            pt2 = (x+w,y+h)
+            detected_car_pos.append([cx,cy])
+            detected_car_rectangles.append([pt1,pt2])
+    return detected_car_pos,detected_car_rectangles
+
+
+# In[150]:
+
+# pipeline
+# Implement a sliding-window technique and use your trained classifier to search for vehicles in images.
+img = cv2.imread('test_images/test6.jpg') # two cars, black and white
+img = cv2.imread('test_images/test5.jpg') # two cars, black and white
+img = cv2.imread('test_images/test4.jpg') # two cars, black and white
+img = cv2.imread('test_images/test3.jpg') # two cars, black and white
+# img = cv2.imread('test_images/test2.jpg') # no cars
+img = cv2.imread('test_images/test1.jpg') # two cars, black and white
+# img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
+
+rectangles = create_list_rectangles(img,overlap = 0.4)
+
+heat_map = get_heat_map(img,cspace_val,rectangles,spatial_size_val,hist_bins_val,
+                hist_range_val,hog_channel_val,orient_val,pix_per_cell_val,cell_per_block_val)
+
+filtered_heat_map = filter_heat_map(heat_map,th_ratio=0.5)
+
+detected_car_pos,detected_car_rectangles = get_detected(filtered_heat_map,area_th = 500)
+
+
+
+# In[151]:
+
+
+# Ploting images
+
+labeled_img = draw_rectangles(img,rectangles)
+detected_cars = draw_rectangles(img,detected_car_rectangles,color= (255,255,255))
+
+
+fig, ((ax1, ax2, ax3,ax4, ax5)) = plt.subplots(5, 1, figsize=(24, 9))
+fig.tight_layout();
 ax1.imshow(img)
 ax1.set_title('original image')
-ax2.imshow(detected_img)
+ax2.imshow(labeled_img)
 ax2.set_title('Detected img')
 ax3.imshow(heat_map)
 ax3.set_title('Heat map')
-ax4.imshow(final_img)
-ax4.set_title('Final image')
-plt.show()
-
-# plt.imshow(filt_red_ch,cmap='gray')
-# plt.show()
-
-
-# In[69]:
-
-# define a threshold for minimum area required to be a positive detection
-area_th = 20
-imgray = heat_map[:,:,0]#cv2.cvtColor(heat_map,cv2.COLOR_BGR2GRAY)
-ret,thresh = cv2.threshold(imgray,60,255,0)
-im2, contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-
-detected_car_pos = [];
-detected_car_rectangles = [];
-for contour in contours:
-    # get x and y values for all the contour points
-    area = cv2.contourArea(contour)
-    
-    if area>area_th:
-#         hull = cv2.convexHull(contour) # get the convex contour
-#         print("hull",hull)
-        x,y,w,h = cv2.boundingRect(contour)
-        pt1 = (x,y)
-        pt2 = (x+w,y+h)
-#         cv2.rectangle(img,(x,y),(x+w,y+h),(0,255,0),2)
-#         x_values=[]
-#         y_values=[]
-#         for element in contour:
-#             x_values.append(element[0][0])
-#             y_values.append(element[0][1])
-
-        # define points for detected car in the form of a rectangle
-#         pt1 = (min(x_values),min(y_values))
-#         pt2 = (max(x_values),max(y_values))
-        detected_car_pos.append([(pt1[0]+pt1[1])/2,(pt1[0]+pt1[1])/2])
-        detected_car_rectangles.append([pt1,pt2])
-#     cv2.rectangle(im2,pt1, pt2, (255,255,255),thickness=4)
-
-im2 = draw_rectangles(img,detected_car_rectangles,color= (255,255,255))
-# cv2.drawContours(img, contours, -1, (0,255,0), 3)
-plt.imshow(heat_map)
-plt.show()
-plt.imshow(im2)
-plt.show()
-print("detected_car_pos",detected_car_pos)
-
-
-# In[ ]:
-
-
+ax4.imshow(filtered_heat_map)
+ax4.set_title('Filtered heat_map')
+ax5.imshow(detected_cars)
+ax5.set_title('Detected cars')
+ax1.axis('off');
+ax2.axis('off');
+ax3.axis('off');
+ax4.axis('off');
+ax5.axis('off');
+plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.);
+plt.show();
 
 
 # In[ ]:
