@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[158]:
 
 # import methods
 
@@ -22,6 +22,11 @@ from sklearn.svm import LinearSVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.externals import joblib
 
+# Import everything needed to edit/save/watch video clips
+
+from IPython.display import HTML
+from moviepy.editor import VideoFileClip
+
 # NOTE: the next import is only valid 
 # for scikit-learn version <= 0.17
 # if you are using scikit-learn >= 0.18 then use this:
@@ -29,7 +34,7 @@ from sklearn.model_selection import train_test_split
 # from sklearn.cross_validation import train_test_split
 
 
-# In[2]:
+# In[ ]:
 
 ## General Settings
 
@@ -340,7 +345,68 @@ def get_detected(heat_map,area_th = 20):
     return detected_car_pos,detected_car_rectangles
 
 
-# In[150]:
+# In[163]:
+
+def process_image(img,debug=0):
+    
+    ################################################################################
+    #these settings have to be made global or loaded via other way
+    cspace_val = 'RGB'
+    spatial_size_val = (32, 32)
+
+    # settings for histogram feature extraction
+    hist_bins_val = 64
+    hist_range_val = (0,256)
+
+    # settings for hog feature extraction
+    orient_val = 12
+    pix_per_cell_val = 16
+    cell_per_block_val = 4
+    hog_channel_val = 0
+    #################################################################################
+    
+    rectangles = create_list_rectangles(img,overlap = 0.4)
+
+    heat_map = get_heat_map(img,cspace_val,rectangles,spatial_size_val,hist_bins_val,
+                    hist_range_val,hog_channel_val,orient_val,pix_per_cell_val,cell_per_block_val)
+
+    filtered_heat_map = filter_heat_map(heat_map,th_ratio=0.5)
+
+    detected_car_pos,detected_car_rectangles = get_detected(filtered_heat_map,area_th = 500)
+    
+    detected_cars_img = draw_rectangles(img,detected_car_rectangles,color= (255,255,255))
+    if debug:
+        # Ploting images
+        labeled_img = draw_rectangles(img,rectangles)
+
+        fig, ((ax1, ax2, ax3,ax4, ax5)) = plt.subplots(5, 1, figsize=(24, 9))
+        fig.tight_layout();
+        ax1.imshow(img)
+        ax1.set_title('original image')
+        ax2.imshow(labeled_img)
+        ax2.set_title('Detected img')
+        ax3.imshow(heat_map)
+        ax3.set_title('Heat map')
+        ax4.imshow(filtered_heat_map)
+        ax4.set_title('Filtered heat_map')
+        ax5.imshow(detected_cars)
+        ax5.set_title('Detected cars')
+        ax1.axis('off');
+        ax2.axis('off');
+        ax3.axis('off');
+        ax4.axis('off');
+        ax5.axis('off');
+        plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.);
+        plt.show();
+        
+    return detected_cars_img
+#     if not hasattr(process_image, "count"):
+#         process_image.left_sp_avg = int(-100000)
+#         process_image.right_sp_avg = int(-100000)
+#         process_image.count = 0
+
+
+# In[161]:
 
 # pipeline
 # Implement a sliding-window technique and use your trained classifier to search for vehicles in images.
@@ -351,46 +417,77 @@ img = cv2.imread('test_images/test3.jpg') # two cars, black and white
 # img = cv2.imread('test_images/test2.jpg') # no cars
 img = cv2.imread('test_images/test1.jpg') # two cars, black and white
 # img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
-
-rectangles = create_list_rectangles(img,overlap = 0.4)
-
-heat_map = get_heat_map(img,cspace_val,rectangles,spatial_size_val,hist_bins_val,
-                hist_range_val,hog_channel_val,orient_val,pix_per_cell_val,cell_per_block_val)
-
-filtered_heat_map = filter_heat_map(heat_map,th_ratio=0.5)
-
-detected_car_pos,detected_car_rectangles = get_detected(filtered_heat_map,area_th = 500)
+process_image(img,debug=1);
 
 
 
-# In[151]:
+
+# In[152]:
+
+# get an image from video and plug it in the pipeline
+# the pipeline should accept a 
 
 
-# Ploting images
+# In[164]:
 
-labeled_img = draw_rectangles(img,rectangles)
-detected_cars = draw_rectangles(img,detected_car_rectangles,color= (255,255,255))
+video_output = 'project_video_output.mp4';
+clip1 = VideoFileClip("project_video.mp4");
+video_clip = clip1.fl_image(process_image); #NOTE: this function expects color images!!
+get_ipython().magic('time video_clip.write_videofile(video_output, audio=False);')
+print('Finished processing video file')
 
 
-fig, ((ax1, ax2, ax3,ax4, ax5)) = plt.subplots(5, 1, figsize=(24, 9))
-fig.tight_layout();
-ax1.imshow(img)
-ax1.set_title('original image')
-ax2.imshow(labeled_img)
-ax2.set_title('Detected img')
-ax3.imshow(heat_map)
-ax3.set_title('Heat map')
-ax4.imshow(filtered_heat_map)
-ax4.set_title('Filtered heat_map')
-ax5.imshow(detected_cars)
-ax5.set_title('Detected cars')
-ax1.axis('off');
-ax2.axis('off');
-ax3.axis('off');
-ax4.axis('off');
-ax5.axis('off');
-plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.);
-plt.show();
+# In[ ]:
+
+# initialise static variables
+process_image.left_sp_avg = -10000
+process_image.right_sp_avg = -10000
+process_image.count = 0
+
+
+# In[ ]:
+
+
+
+
+# In[ ]:
+
+
+
+
+# In[ ]:
+
+
+
+
+# In[ ]:
+
+
+
+
+# In[ ]:
+
+
+
+
+# In[ ]:
+
+
+
+
+# In[ ]:
+
+
+
+
+# In[ ]:
+
+
+
+
+# In[ ]:
+
+
 
 
 # In[ ]:
