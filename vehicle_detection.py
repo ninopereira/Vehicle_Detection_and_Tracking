@@ -1,16 +1,16 @@
 
 # coding: utf-8
 
-# In[85]:
+# In[193]:
 
 # import methods
 
-from methods import plot3d
-from methods import bin_spatial
-from methods import color_hist
-from methods import get_hog_features
-from methods import extract_features
-from methods import slide_window
+# from methods import plot3d
+# from methods import bin_spatial
+# from methods import color_hist
+# from methods import get_hog_features
+# # from methods import extract_features
+# from methods import slide_window
 
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
@@ -21,7 +21,7 @@ import time
 from sklearn.svm import LinearSVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.externals import joblib
-
+from skimage.feature import hog
 # Import everything needed to edit/save/watch video clips
 
 from IPython.display import HTML
@@ -34,54 +34,269 @@ from sklearn.model_selection import train_test_split
 # from sklearn.cross_validation import train_test_split
 
 
-# In[86]:
+# In[194]:
 
-## General Settings
-
-# settings for colorspace feature extraction
-cspace_val = 'RGB'#'RGB'
-spatial_size_val = (32, 32)
-
-# settings for histogram feature extraction
-hist_bins_val = 64
-hist_range_val = (0,256)
-
-# settings for hog feature extraction
-orient_val = 9
-pix_per_cell_val = 8
-cell_per_block_val = 2
-# orient_val = 12
-# pix_per_cell_val = 16
-# cell_per_block_val = 4
-hog_channel_val = 2
-
-
-# In[87]:
-
-# crop image to a given region of interes defined by the vertices
-def region_of_interest(img, vertices, color_max_value = 255):
-    """
-    Applies an image mask.
-    
-    Only keeps the region of the image defined by the polygon
-    formed from `vertices`. The rest of the image is set to black.
-    """
-    #defining a blank mask to start with
-    mask = np.zeros_like(img)   
-    
-    #defining a 3 channel or 1 channel color to fill the mask with depending on the input image
-    if len(img.shape) > 2:
-        channel_count = img.shape[2]  # i.e. 3 or 4 depending on your image
-        ignore_mask_color = (color_max_value,) * channel_count
-    else:
-        ignore_mask_color = color_max_value
+class CarDetector:
+   
+    def __init__(self, cspace='RGB', spatial_size=(32, 32),
+                 hist_bins=32, hist_range=(0, 256), orient=9, 
+                 pix_per_cell=8, cell_per_block=2, hog_channel=0):
         
-    #filling pixels inside the polygon defined by "vertices" with the fill color    
-    cv2.fillPoly(mask, vertices, ignore_mask_color)
+        self.cspace =cspace
+        self.spatial_size = spatial_size
+        self.hist_bins = hist_bins
+        self.hist_range=hist_range
+        self.orient = orient
+        self.pix_per_cell=pix_per_cell
+        self.cell_per_block=cell_per_block
+        self.hog_channel=hog_channel
+        self.vis=False
+        self.feature_vec=True
+        self.classifier = []
+        self.scaler = []
+        
+    def get_classifier(self):
+        return self.classifier
     
-    #returning the image only where mask pixels are nonzero
-    masked_image = cv2.bitwise_and(img, mask)
-    return masked_image
+    def get_scaler(self):
+        return self.scaler
+
+    def train_classifier(self,cars,notcars):
+        classifier_file = 'classifier.pkl'
+        scaler_file = 'scaler.pkl'
+        # extract features from dataset
+        car_features = car_detector.extract_features(cars)
+        print("Car features extracted")
+        notcar_features = car_detector.extract_features(notcars)
+        print("Other features extracted")# Create an array stack of feature vectors
+        X = np.vstack((car_features, notcar_features)).astype(np.float64)                        
+        # Fit a per-column scaler
+        X_scaler = StandardScaler().fit(X)
+        print("X_scaler ready")
+        #save the model
+        joblib.dump(X_scaler, scaler_file)
+        # Apply the scaler to X - normalise data
+        scaled_X = X_scaler.transform(X)
+        print("Data normalised")
+        # Define the labels vector
+        y = np.hstack((np.ones(len(car_features)), np.zeros(len(notcar_features))))
+
+        # Split up data into randomized training and test sets
+        rand_state = np.random.randint(0, 100)
+        X_train, X_test, y_train, y_test = train_test_split(
+            scaled_X, y, test_size=0.2, random_state=rand_state)
+
+        # Use a linear SVC 
+        svc = LinearSVC()
+        # Check the training time for the SVC
+        t=time.time()
+        svc.fit(X_train, y_train)
+        t2 = time.time()
+        print(t2-t, 'Seconds to train SVC...')
+        # Check the score of the SVC
+        print('Train Accuracy of SVC = ', svc.score(X_train, y_train))
+        print('Test Accuracy of SVC = ', svc.score(X_test, y_test))
+        # Check the prediction time for a single sample
+        t=time.time()
+        prediction = svc.predict(X_test[0].reshape(1, -1))
+        print("prediction",prediction)
+        t2 = time.time()
+        print(t2-t, 'Seconds to predict with SVC')
+        print(svc)
+        # save the model
+        joblib.dump(svc, classifier_file)
+        self.classifier = svc
+        self.scaler = X_scaler
+        print("Model saved as:",classifier_file," and ", scaler_file)
+    
+    def load_classifier(self,classifier_file,scaler_file):
+        self.classifier = joblib.load(classifier_file)
+        self.scaler = joblib.load(scaler_file)
+        print("Model loaded: \n\n",self.classifier)
+    
+    # Define a function to compute binned color features  
+    def bin_spatial(self, img):
+        # Use cv2.resize().ravel() to create the feature vector
+        features = cv2.resize(img,self.spatial_size).ravel() 
+        # Return the feature vector
+        return features
+    
+    # Define a function to compute color histogram features  
+    def color_hist(self,img):
+        # Compute the histogram of the color channels separately
+        channel1_hist = np.histogram(img[:,:,0], bins=self.hist_bins, range=self.hist_range)
+        channel2_hist = np.histogram(img[:,:,1], bins=self.hist_bins, range=selfhist_range)
+        channel3_hist = np.histogram(img[:,:,2], bins=self.hist_bins, range=self.hist_range)
+        # Concatenate the histograms into a single feature vector
+        hist_features = np.concatenate((channel1_hist[0], channel2_hist[0], channel3_hist[0]))
+        # Return the individual histograms, bin_centers and feature vector
+        return hist_features
+    
+    # Define a function to return HOG features and visualization
+    def get_hog_features(self,img):
+        # Call with two outputs if vis==True
+        if vis == True:
+            features, hog_image = hog(img, orientations=self.orient, pixels_per_cell=(self.pix_per_cell, self.pix_per_cell),
+                                      cells_per_block=(self.cell_per_block, self.cell_per_block), transform_sqrt=True, 
+                                      visualise=self.vis, feature_vector=self.feature_vec)
+            return features, hog_image
+        # Otherwise call with one output
+        else:      
+            features = hog(img, orientations=orient, pixels_per_cell=(self.pix_per_cell, self.pix_per_cell),
+                           cells_per_block=(self.cell_per_block, self.cell_per_block), transform_sqrt=True, 
+                           visualise=self.vis, feature_vector=self.feature_vec)
+            return features
+
+    def extract_features_img(self, rgb_img):
+    # apply color conversion if other than 'RGB'
+        if self.cspace != 'RGB':
+            if self.cspace == 'HSV':
+                feature_image = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2HSV)
+            elif self.cspace == 'LUV':
+                feature_image = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2LUV)
+            elif self.cspace == 'HLS':
+                feature_image = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2HLS)
+            elif self.cspace == 'YUV':
+                feature_image = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2YUV)
+        else: 
+    #             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # convert to rgb
+                feature_image = np.copy(rgb_img)
+        # Apply bin_spatial() to get spatial color features
+        spatial_features = bin_spatial(feature_image, size=self.spatial_size)
+        # Apply color_hist() also with a color space option now
+        hist_features = color_hist(feature_image, nbins=self.hist_bins, bins_range=self.hist_range)
+        # Call get_hog_features() with vis=False, feature_vec=True
+        hog_features_0 = get_hog_features(feature_image[:,:,0], self.orient, 
+                        self.pix_per_cell, self.cell_per_block, vis=False, feature_vec=True)
+        hog_features_1 = get_hog_features(feature_image[:,:,1], self.orient, 
+                        self.pix_per_cell, self.cell_per_block, vis=False, feature_vec=True)
+        hog_features_2 = get_hog_features(feature_image[:,:,2], self.orient, 
+                        self.pix_per_cell, self.cell_per_block, vis=False, feature_vec=True)
+        # Append the new feature vector to the features list
+        features= np.concatenate((spatial_features, hist_features, hog_features_0,hog_features_1, hog_features_2))
+        return features
+            
+    # Define a function to extract features from a list of images
+    # Have this function call bin_spatial() and color_hist()
+    # this function combines color, histogram and hog features extraction
+    def extract_features(self,img_files):
+        # Create a list to append feature vectors to
+        features = []
+        # Iterate through the list of images
+        for file in img_files:
+            # Read in each one by one
+            rgb_img = mpimg.imread(file)
+    #         image = cv2.imread(file) # reads a file into bgr values 0-255
+            features.append(self.extract_features_img(rgb_img))
+        
+        # Return list of feature vectors
+        return features
+    
+    # Define a function that takes an image,
+    # start and stop positions in both x and y, 
+    # window size (x and y dimensions),  
+    # and overlap fraction (for both x and y)
+    def slide_window(self,img, x_start_stop=[None, None], y_start_stop=[None, None], 
+                        xy_window=(64, 64), xy_overlap=(0.5, 0.5),max_y=780):
+        height, width, channels = img.shape
+        # If x and/or y start/stop positions not defined, set to image size
+        if x_start_stop[0] == None:
+            x_start_stop[0] = 0
+        if x_start_stop[1] == None:
+            x_start_stop[1] = img.shape[1]
+        if y_start_stop[0] == None:
+            y_start_stop[0] = 0
+        if y_start_stop[1] == None:
+            y_start_stop[1] = img.shape[0]
+        # Compute the span of the region to be searched    
+        xspan = x_start_stop[1] - x_start_stop[0]
+        yspan = y_start_stop[1] - y_start_stop[0]
+        # Compute the number of pixels per step in x/y
+        nx_pix_per_step = np.int(xy_window[0]*(1 - xy_overlap[0]))
+        ny_pix_per_step = np.int(xy_window[1]*(1 - xy_overlap[1]))
+        # Compute the number of windows in x/y
+        nx_windows = np.int(xspan/nx_pix_per_step) - 1
+        ny_windows = np.int(yspan/ny_pix_per_step) - 1
+        # Initialize a list to append window positions to
+        window_list = []
+        # Loop through finding x and y window positions
+        # Note: you could vectorize this step, but in practice
+        # you'll be considering windows one by one with your
+        # classifier, so looping makes sense
+        for ys in range(ny_windows):
+            for xs in range(nx_windows):
+                # Calculate window position
+                startx = int(xs*nx_pix_per_step + x_start_stop[0])
+                endx = int(startx + xy_window[0])
+                starty = int(ys*ny_pix_per_step + y_start_stop[0])
+                endy = int(starty + xy_window[1])
+                # Append window position to list
+                if endy<height and endx < width and endy<max_y:
+                    window_list.append(((startx, starty), (endx, endy)))
+        # Return the list of windows
+        return window_list
+
+
+# In[ ]:
+
+def load_dataset():
+    cars = []
+    notcars = []
+
+    # load vehicle images
+    images = glob.iglob('vehicles/**/*.png', recursive=True)
+    for image in images:
+        cars.append(image)
+
+    # load non vehicle images
+    images = glob.iglob('non-vehicles/**/*.png', recursive=True)
+    for image in images:
+        notcars.append(image)
+
+    print('cars = ',len(cars))
+    print('notcars = ',len(notcars))
+    return cars,notcars
+
+def peak_data(cars, notcars):
+    data_info = data_look(cars, notcars)
+    print('Your function returned a count of', 
+          data_info["n_cars"], ' cars and', 
+          data_info["n_notcars"], ' non-cars')
+    print('of size: ',data_info["image_shape"], ' and data type:', 
+          data_info["data_type"])
+    # Just for fun choose random car / not-car indices and plot example images   
+    car_ind = np.random.randint(0, len(cars))
+    notcar_ind = np.random.randint(0, len(notcars))
+
+    # Read in car / not-car images
+    car_image = mpimg.imread(cars[car_ind])
+    notcar_image = mpimg.imread(notcars[notcar_ind])
+
+    # Plot the examples
+    fig = plt.figure()
+    plt.subplot(121)
+    plt.imshow(car_image)
+    plt.title('Example Car Image')
+    plt.subplot(122)
+    plt.imshow(notcar_image)
+    plt.title('Example Not-car Image')
+    plt.show()
+
+# Define a function to return some characteristics of the dataset 
+def data_look(car_list, notcar_list):
+    data_dict = {}
+    # Define a key in data_dict "n_cars" and store the number of car images
+    data_dict["n_cars"] = len(car_list)
+    # Define a key "n_notcars" and store the number of notcar images
+    data_dict["n_notcars"] = len(notcar_list)
+    # Read in a test image, either car or notcar
+    example_img = mpimg.imread(car_list[0])
+    # Define a key "image_shape" and store the test image shape 3-tuple
+    data_dict["image_shape"] = example_img.shape
+    # Define a key "data_type" and store the data type of the test image.
+    data_dict["data_type"] = example_img.dtype
+    # Return data_dict
+    return data_dict
 
 
 # # Method
@@ -94,89 +309,27 @@ def region_of_interest(img, vertices, color_max_value = 255):
 
 # # Combined Color, Histogram and HOG Classification
 
-# In[88]:
+# In[ ]:
 
-# Histogram of Oriented Gradients (HOG) feature extraction on a labeled training set of images and train a classifier Linear SVM classifier
+new_model = False
+new_model = True
 
-cars = []
-notcars = []
-
-# load vehicle images
-images = glob.iglob('vehicles/**/*.png', recursive=True)
-for image in images:
-   cars.append(image)
-   
-# load non vehicle images
-images = glob.iglob('non-vehicles/**/*.png', recursive=True)
-for image in images:
-   notcars.append(image)
-
-print('cars = ',len(cars))
-print('notcars = ',len(notcars))
-
-# experiment other color spaces like LUV, HLS
-
-car_features = extract_features(cars, cspace=cspace_val, spatial_size=spatial_size_val,
-                       hist_bins=hist_bins_val, hist_range=hist_range_val, orient=orient_val, 
-                       pix_per_cell=pix_per_cell_val, cell_per_block=cell_per_block_val, hog_channel=hog_channel_val)
-
-print("Car features extracted")
-
-notcar_features = extract_features(notcars, cspace=cspace_val, spatial_size=spatial_size_val,
-                       hist_bins=hist_bins_val, hist_range=hist_range_val, orient=orient_val, 
-                       pix_per_cell=pix_per_cell_val, cell_per_block=cell_per_block_val, hog_channel=hog_channel_val)
-
-print("Other features extracted")
+# create a CarDetector object
+car_detector = CarDetector(cspace='YUV',hog_channel=1) # Options: RGB, HSV, LUV, HLS, YUV 
+        
+if (new_model):
+    # load the dataset
+    cars,notcars = load_dataset()
+    peak_data(cars,notcars)
+    #train the classifier
+    car_detector.train_classifier(cars,notcars)
+else:
+    # load existing model
+    car_detector = CarDetector()
+    car_detector.load_classifier('classifier.pkl','scaler.pkl')
 
 
-# In[89]:
-
-# Create an array stack of feature vectors
-X = np.vstack((car_features, notcar_features)).astype(np.float64)                        
-# Fit a per-column scaler
-X_scaler = StandardScaler().fit(X)
-print("X_scaler ready")
-
-
-# In[90]:
-
-#save the model
-joblib.dump(X_scaler, 'X_scaler_model.pkl')
-
-
-# In[91]:
-
-# Apply the scaler to X - normalise data
-scaled_X = X_scaler.transform(X)
-print("Data normalised")
-
-
-# In[92]:
-
-# Define the labels vector
-y = np.hstack((np.ones(len(car_features)), np.zeros(len(notcar_features))))
-
-# Split up data into randomized training and test sets
-rand_state = np.random.randint(0, 100)
-X_train, X_test, y_train, y_test = train_test_split(
-    scaled_X, y, test_size=0.2, random_state=rand_state)
-
-# Use a linear SVC 
-svc = LinearSVC()
-# Check the training time for the SVC
-t=time.time()
-svc.fit(X_train, y_train)
-t2 = time.time()
-print(t2-t, 'Seconds to train SVC...')
-# Check the score of the SVC
-print('Train Accuracy of SVC = ', svc.score(X_train, y_train))
-print('Test Accuracy of SVC = ', svc.score(X_test, y_test))
-# Check the prediction time for a single sample
-t=time.time()
-prediction = svc.predict(X_test[0].reshape(1, -1))
-print("prediction",prediction)
-t2 = time.time()
-print(t2-t, 'Seconds to predict with SVC')
+# In[ ]:
 
 # RGB test accuracy = 0.9788 and low number of false positives in test images
 # HSV test accuracy = 0.9777 but lots of false positives
@@ -185,36 +338,9 @@ print(t2-t, 'Seconds to predict with SVC')
 # YUV test accuracy = 0.9786 but lots of false positives  
 
 
-# In[93]:
-
-print(svc)
-
-
-# In[94]:
-
-# save the model
-joblib.dump(svc, 'svc_model.pkl')
-
-
-# # ---------------------------------
-# # LOAD the Models
-# # ---------------------------------
-# 
-# 'svc_model.pkl'
-# 
-# 'X_scaler_model.pkl'
-
-# In[95]:
-
-# load the model
-svc = joblib.load('svc_model.pkl')
-X_scaler = joblib.load('X_scaler_model.pkl')
-print("Model loaded: \n\n",svc)
-
-
 # # Sliding Window Implementation
 
-# In[96]:
+# In[169]:
 
 def draw_rectangles(img,window_list,color= (255,255,255)):
     labeled_img = img.copy()
@@ -226,13 +352,12 @@ def draw_rectangles(img,window_list,color= (255,255,255)):
     return labeled_img
 
 
-# In[97]:
+# In[170]:
 
 # create a list of rectangles with different sizes across the lower part of the image for searching cars
-def create_list_rectangles(img,overlap = 0.75):
+def create_list_rectangles(img):
     
     height, width, channels = img.shape
-#     print('height, width, channels = ',height, width, channels)
     window_list=();
     rectangles = []
 
@@ -240,14 +365,12 @@ def create_list_rectangles(img,overlap = 0.75):
     start_h = step_h#int(height/4)
     stop_h = height 
     size_of_sq = int(256 * (1/height))
-    original_y_val = int(9*height/16) #int(6*height/11)
-    # original_y_val = int(6*height/12)
-    y_val = original_y_val    
+    y_val = int(9*height/16) 
 
-    size_vec = [64, 96, 128, 160]
-    overlap_vec = [0, 0.5, 0.65, 0.8]
-    # size_vec = [160]
-    # overlap_vec = [0.8]
+#     size_vec = [64, 96, 128, 160]
+#     overlap_vec = [0, 0.5, 0.65, 0.8]
+    size_vec = [128, 160, 192, 224]
+    overlap_vec = [0.5, 0.5, 0.5, 0.5]
     for i in range(len(size_vec)):
         size = size_vec[i]
         overlap = overlap_vec[i]
@@ -257,55 +380,42 @@ def create_list_rectangles(img,overlap = 0.75):
     return rectangles
 
 
-# In[98]:
+# In[171]:
 
 # Create the heat map
-def get_heat_map(img,cspace_val,rectangles,spatial_size_val,hist_bins_val,
-                hist_range_val,hog_channel_val,orient_val,pix_per_cell_val,cell_per_block_val):
+def get_heat_map(img,rectangles,car_detector):
     
-    heat_increment = 10
+    heat_increment = 20
     CV_FILLED = -1
     heat_map = np.zeros_like(img)
-    if cspace_val != 'RGB':
-        if cspace_val == 'HSV':
-            feature_image = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        elif cspace_val == 'LUV':
-            feature_image = cv2.cvtColor(img, cv2.COLOR_BGR2LUV)
-        elif cspace_val == 'HLS':
-            feature_image = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
-        elif cspace_val == 'YUV':
-            feature_image = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
-    else: 
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # convert to rgb
-        feature_image = np.copy(img)     
-
+    
     for rectangle in rectangles:
         heat_img = np.zeros_like(img)
         pt1 = rectangle[0]
         pt2 = rectangle[1]
         crop_img = img[pt1[1]:pt2[1], pt1[0]:pt2[0]]
         size = (64,64)
-        crop_img = cv2.resize(crop_img, size)
+        crop_img = cv2.resize(crop_img, size)#.astype(np.float64)
+        
+        img_features = car_detector.extract_features_img(crop_img)
 
-        img_features =[]
-        spatial_features = bin_spatial(crop_img, size=spatial_size_val)
-        hist_features = color_hist(crop_img, nbins=hist_bins_val, bins_range=hist_range_val)
-        hog_features = get_hog_features(crop_img[:,:,hog_channel_val], orient=orient_val, 
-                        pix_per_cell=pix_per_cell_val, cell_per_block=cell_per_block_val, vis=False, feature_vec=True)
-
-        img_features.append(np.concatenate((spatial_features, hist_features, hog_features)))
-        X = np.vstack((img_features)).astype(np.float64)
-        X = np.array(X).reshape(1, -1)
-
-        scaled_X = X_scaler.transform(X)
-        prediction = svc.predict(scaled_X.reshape(1, -1))
+        features = np.vstack((img_features)).astype(np.float64)
+        features = np.array(features).reshape(1, -1)
+        
+        feature_scaler = car_detector.get_scaler()
+        classifier = car_detector.get_classifier()
+        
+        scaled_features = feature_scaler.transform(features)
+        prediction = classifier.predict(scaled_features.reshape(1, -1))
+        
         if prediction == 1:
             cv2.rectangle(heat_img, pt1, pt2, color=(heat_increment,0,0), thickness=CV_FILLED)
             heat_map = cv2.add(heat_map, heat_img)
+            
     return heat_map
 
 
-# In[99]:
+# In[172]:
 
 # apply filter to the heat_map
 # Note: th_ratio should be a ratio (0-1)
@@ -323,13 +433,14 @@ def filter_heat_map(heat_map, th_ratio=0.5):
     return filt_heat_map
 
 
-# In[100]:
+# In[173]:
 
 # computes positions and bounding rectangles identifying the location of detected vehicles
 def get_detected(heat_map,area_th = 20):
      # define a threshold for minimum area required to be a positive detection
     imgray = heat_map[:,:,0]#cv2.cvtColor(heat_map,cv2.COLOR_BGR2GRAY)
-    ret,thresh = cv2.threshold(imgray,60,255,0)
+    ret,thresh = cv2.threshold(imgray.astype(np.uint8),130,255,cv2.THRESH_BINARY)
+    
     im2, contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
 #     im2, contours, hierarchy = cv2.findContours(heat_map[:,:,0],cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
     detected_car_pos = [];
@@ -350,150 +461,93 @@ def get_detected(heat_map,area_th = 20):
     return detected_car_pos,detected_car_rectangles
 
 
-# In[109]:
+# In[174]:
 
 def process_image(img,debug=0):
     
-    ################################################################################
-    #these settings have to be made global or loaded via other way
-    cspace_val = 'RGB'#'RGB'
-    spatial_size_val = (32, 32)
-
-    # settings for histogram feature extraction
-    hist_bins_val = 64
-    hist_range_val = (0,256)
-
-    # settings for hog feature extraction
-    orient_val = 9
-    pix_per_cell_val = 8
-    cell_per_block_val = 2
-    # orient_val = 12
-    # pix_per_cell_val = 16
-    # cell_per_block_val = 4
-    hog_channel_val = 2
-    #################################################################################
+    if not hasattr(process_image, "heat_map_old"):
+        process_image.heat_map_old = np.zeros_like(img)
     
-    rectangles = create_list_rectangles(img,overlap = 0.5)
+    if not process_image.heat_map_old.size:
+        process_image.heat_map_old = np.zeros_like(img)
+    
+    decay = 0.2
+    # apply decay to the heat_map
+    process_image.heat_map_old = process_image.heat_map_old*(1-decay)
+    
+    rectangles = create_list_rectangles(img)
 
-    heat_map = get_heat_map(img,cspace_val,rectangles,spatial_size_val,hist_bins_val,
-                    hist_range_val,hog_channel_val,orient_val,pix_per_cell_val,cell_per_block_val)
-
+    heat_map = get_heat_map(img,rectangles,process_image.car_detector)
+    
     filtered_heat_map = filter_heat_map(heat_map,th_ratio=0.1)
+    
+    process_image.heat_map_old = (filtered_heat_map*0.5 + process_image.heat_map_old*0.5)
 
-    detected_car_pos,detected_car_rectangles = get_detected(filtered_heat_map,area_th = 1000)
+    detected_car_pos,detected_car_rectangles = get_detected(process_image.heat_map_old,area_th = 1000)
     
     detected_cars_img = draw_rectangles(img,detected_car_rectangles,color= (255,255,255))
     if debug:
         # Ploting images
         labeled_img = draw_rectangles(img,rectangles)
 
-        fig, ((ax1, ax2, ax3,ax4, ax5)) = plt.subplots(5, 1, figsize=(24, 9))
+        fig, ((ax1, ax2, ax3),(ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(24, 9))
         fig.tight_layout();
-        ax1.imshow(img)
-        ax1.set_title('original image')
-        ax2.imshow(labeled_img)
-        ax2.set_title('Detected img')
-        ax3.imshow(heat_map)
-        ax3.set_title('Heat map')
-        ax4.imshow(filtered_heat_map)
-        ax4.set_title('Filtered heat_map')
-        ax5.imshow(detected_cars_img)
-        ax5.set_title('Detected cars')
+        
+
+        ax1.imshow(heat_map)
+        ax1.set_title('Heat map')
+        ax2.imshow(filtered_heat_map.astype(np.uint8))
+        ax2.set_title('Filtered heat_map')
+        ax3.imshow(process_image.heat_map_old.astype(np.uint8))
+        ax3.set_title('Used heat_map')
+        ax4.imshow(img)
+        ax4.set_title('Source image')
+        ax5.imshow(labeled_img)
+        ax5.set_title('Positive cars')
+        ax6.imshow(detected_cars_img)
+        ax6.set_title('Confirmed cars')
         ax1.axis('off');
         ax2.axis('off');
         ax3.axis('off');
         ax4.axis('off');
         ax5.axis('off');
+        ax6.axis('off');
         plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.);
         plt.show();
         
     return detected_cars_img
-#     if not hasattr(process_image, "count"):
-#         process_image.left_sp_avg = int(-100000)
-#         process_image.right_sp_avg = int(-100000)
-#         process_image.count = 0
 
 
-# In[111]:
+# In[175]:
+
+#reset heat_map_old
+process_image.heat_map_old=np.zeros_like(img)
+process_image.car_detector = car_detector
+
+
+# In[179]:
 
 # pipeline
 # Implement a sliding-window technique and use your trained classifier to search for vehicles in images.
-img = cv2.imread('test_images/test6.jpg') # two cars, black and white
-img = cv2.imread('test_images/test5.jpg') # two cars, black and white
-img = cv2.imread('test_images/test4.jpg') # two cars, black and white
-img = cv2.imread('test_images/test3.jpg') # two cars, black and white
+
+img = mpimg.imread('test_images/test6.jpg') # two cars, black and white
+img = mpimg.imread('test_images/test5.jpg') # two cars, black and white
+# img = mpimg.imread('test_images/test4.jpg') # two cars, black and white
+# img = mpimg.imread('test_images/test3.jpg') # white car
 # img = cv2.imread('test_images/test2.jpg') # no cars
-img = cv2.imread('test_images/test1.jpg') # two cars, black and white
+# img = cv2.imread('test_images/test1.jpg') # two cars, black and white
 # img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
+# img = img.astype(np.float32)
 process_image(img,debug=1);
 
 
-# In[74]:
+# In[153]:
 
-# get an image from video and plug it in the pipeline
-# the pipeline should accept a 
-
-
-# In[112]:
-
-video_output = 'project_video_output.mp4';
-clip1 = VideoFileClip("project_video.mp4");
+video_output = 'small_video_output.mp4';
+clip1 = VideoFileClip("small_video.mp4");
 video_clip = clip1.fl_image(process_image); #NOTE: this function expects color images!!
 get_ipython().magic('time video_clip.write_videofile(video_output, audio=False);')
 print('Finished processing video file')
-
-
-# In[ ]:
-
-# initialise static variables
-process_image.left_sp_avg = -10000
-process_image.right_sp_avg = -10000
-process_image.count = 0
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
-
-
-# In[ ]:
-
-
 
 
 # In[ ]:

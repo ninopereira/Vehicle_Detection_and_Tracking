@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[14]:
+# In[1]:
 
 # import functions
 import numpy as np
@@ -16,20 +16,20 @@ from methods import plot3d
 from methods import extract_features
 
 
-# In[10]:
+# In[6]:
 
 # test plot3d method
 
 # Read a color image
-img = cv2.imread("test_images/test6.jpg")
+img = mpimg.imread("test_images/test6.jpg")
 
 # Select a small fraction of pixels to plot by subsampling it
 scale = max(img.shape[0], img.shape[1], 64) / 64  # at most 64 rows and columns
 img_small = cv2.resize(img, (np.int(img.shape[1] / scale), np.int(img.shape[0] / scale)), interpolation=cv2.INTER_NEAREST)
 
 # Convert subsampled image to desired color space(s)
-img_small_RGB = cv2.cvtColor(img_small, cv2.COLOR_BGR2RGB)
-
+# img_small_RGB = cv2.cvtColor(img_small, cv2.COLOR_BGR2RGB)
+img_small_RGB = img_small
 img_small_rgb = img_small_RGB / 255.  # scaled to [0, 1], only for plotting
 
 # Plot and show
@@ -41,7 +41,7 @@ plot3d(img_small_HSV, img_small_rgb, axis_labels=list("HSV"))
 plt.show()
 
 
-# In[11]:
+# In[8]:
 
 # images = glob.glob('*.jpeg')
 # cars = []
@@ -62,9 +62,9 @@ for image in images:
     else:
         notcars.append(image)
         
-car_features = extract_features(cars, cspace='HLS', spatial_size=(32, 32),
+car_features = extract_features(cars, cspace='HSV', spatial_size=(32, 32),
                         hist_bins=32, hist_range=(0, 256))
-notcar_features = extract_features(notcars, cspace='HLS', spatial_size=(32, 32),
+notcar_features = extract_features(notcars, cspace='HSV', spatial_size=(32, 32),
                         hist_bins=32, hist_range=(0, 256))
 
 if len(car_features) > 0:

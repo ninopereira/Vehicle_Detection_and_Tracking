@@ -107,8 +107,8 @@ def extract_features(imgs, cspace='RGB', spatial_size=(32, 32),
     # Iterate through the list of images
     for file in imgs:
         # Read in each one by one
-        #image = mpimg.imread(file)
-        image = cv2.imread(file) # reads a file into bgr values 0-255
+        image = mpimg.imread(file)
+#         image = cv2.imread(file) # reads a file into bgr values 0-255
         
         # apply color conversion if other than 'RGB'
         if cspace != 'RGB':
@@ -121,7 +121,7 @@ def extract_features(imgs, cspace='RGB', spatial_size=(32, 32),
             elif cspace == 'YUV':
                 feature_image = cv2.cvtColor(image, cv2.COLOR_BGR2YUV)
         else: 
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # convert to rgb
+#             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # convert to rgb
             feature_image = np.copy(image)      
         # Apply bin_spatial() to get spatial color features
         spatial_features = bin_spatial(feature_image, size=spatial_size)
