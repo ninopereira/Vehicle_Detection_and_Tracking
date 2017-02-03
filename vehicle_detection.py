@@ -237,7 +237,7 @@ class CarDetector:
         return window_list
 
 
-# In[ ]:
+# In[195]:
 
 def load_dataset():
     cars = []
@@ -309,7 +309,7 @@ def data_look(car_list, notcar_list):
 
 # # Combined Color, Histogram and HOG Classification
 
-# In[ ]:
+# In[196]:
 
 new_model = False
 new_model = True
