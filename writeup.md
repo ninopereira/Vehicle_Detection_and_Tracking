@@ -137,7 +137,7 @@ The result shows only regions of high certainty where vehicles are being detecte
 ####1. Final video output.  
 
 The pipeline works quiet well on identifying positive cars. There are almost no false positives although sometimes due to the nature of the implemented filter, there are some failures in detecting the vehicles continuously.
-Here's a [link to my video result](./output_images/output_video.mp4)
+Here's a [link to my video result](./output_images/project_output.mp4)
 
 
 ####2. Filter for false positives and combining overlapping bounding boxes in a heat map.
