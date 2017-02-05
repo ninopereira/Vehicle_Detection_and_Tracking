@@ -26,7 +26,7 @@ The goals / steps of this project are the following:
 
 [im8]: ./output_images/report_img/test_acc_extr_time.png
 [im9]: ./output_images/report_img/sliding_window.png
-[im10]: ./output_images/report_img/pipeline.png
+[im10]: ./output_images/report_img/pipeline2.png
 [im11]: ./output_images/report_img/result.png
 
 [video1]: ./output_images/project_output.mp4
@@ -109,7 +109,7 @@ svc.fit(X_train, y_train)
 
 ###Sliding Window Search
 
-####1. Describe how (and identify where in your code) you implemented a sliding window search.  How did you decide what scales to search and how much to overlap windows?
+####1. Parameters for the sliding window search: scales and overlap
 
 The number and distribution of windows across the image are very important parameters as they influence the quality and the speed of detection of vehicles in the image.
 First of all it was decided not to search for vehicles in the upper part of the image as it includes mostly the horizon and sky which are not relevant for the task.
@@ -140,7 +140,7 @@ The pipeline works quiet well on identifying positive cars. There are almost no 
 Here's a [link to my video result](./output_images/output_video.mp4)
 
 
-####2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
+####2. Filter for false positives and combining overlapping bounding boxes in a heat map.
 
 I recorded the positions of positive detections in each frame of the video.  From the positive detections I created a heat map and then threshold that map to identify vehicle positions.
 
@@ -157,32 +157,31 @@ In the pipeline the filtering part comprises:
 
 ```javascript
 decay = 0.05
-    # apply decay to the heat_map
-    process_image.heat_map_old = process_image.heat_map_old*(1-decay)
+# apply decay to the heat_map
+process_image.heat_map_old = process_image.heat_map_old*(1-decay)
 
-    #get heat_map
-    heat_map = get_heat_map(img,process_image.rectangles,process_image.car_detector,heat_increment)
-    
-    #filter the heat map to get rid of false positives
-    filtered_heat_map = filter_heat_map(heat_map,th_ratio=0.5)
-    valid_data = get_detected(filtered_heat_map,area_th = 1000,heat_th=heat_thres)
-    # now that we know the location of valid positives
-    # we can use the original heat map to get the complete area and filter out false positives
-    filtered_heat_map = filter_heat_map(heat_map,th_ratio=0.05)
-    data = get_detected(filtered_heat_map,area_th = 1000,heat_th=heat_thres)
-    posit_data = filter_by_location(data, valid_data)
-    
-    # now we create a new filtered_heat_map with the posit_data only
-    filtered_heat_map = create_map_from_data(img,posit_data,heat_increment=255)
-    
-    process_image.heat_map_old = (filtered_heat_map*0.2 + process_image.heat_map_old*0.8)
-#     process_image.heat_map_old = (heat_map + process_image.heat_map_old)
-    
-    final_data = get_detected(process_image.heat_map_old, area_th=1000, heat_th=100)
-    
-    detected_car_rectangles = []
-    for elem in final_data:
-        detected_car_rectangles.append(elem[1])
+#get heat_map
+heat_map = get_heat_map(img,process_image.rectangles,process_image.car_detector,heat_increment)
+
+#filter the heat map to get rid of false positives
+filtered_heat_map = filter_heat_map(heat_map,th_ratio=0.5)
+valid_data = get_detected(filtered_heat_map,area_th = 1000,heat_th=heat_thres)
+# now that we know the location of valid positives
+# we can use the original heat map to get the complete area and filter out false positives
+filtered_heat_map = filter_heat_map(heat_map,th_ratio=0.05)
+data = get_detected(filtered_heat_map,area_th = 1000,heat_th=heat_thres)
+posit_data = filter_by_location(data, valid_data)
+
+# now we create a new filtered_heat_map with the posit_data only
+filtered_heat_map = create_map_from_data(img,posit_data,heat_increment=255)
+
+process_image.heat_map_old = (filtered_heat_map*0.2 + process_image.heat_map_old*0.8)
+
+final_data = get_detected(process_image.heat_map_old, area_th=1000, heat_th=100)
+
+detected_car_rectangles = []
+for elem in final_data:
+detected_car_rectangles.append(elem[1])
     
 ```
 
