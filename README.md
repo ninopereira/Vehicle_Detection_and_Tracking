@@ -2,9 +2,9 @@
 
 ![Sample](output_images/report_img/result.png)
 
-## This is a short report containing a brief description of the main strategies and methods employed in solving the problem of detecting vehicles in a video stream image.
+This is a short report containing a brief description of the main strategies and methods employed in solving the problem of detecting vehicles in a video stream image.
 
-See Video Result [here](https://youtu.be/Fkxe-Hxgbqw)
+#### See Video Result [here](https://youtu.be/Fkxe-Hxgbqw)
 
 
 ## Goals
