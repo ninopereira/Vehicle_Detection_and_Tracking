@@ -1,10 +1,13 @@
-##Writeup
-###This is a short report containing a brief description of the main strategies and methods employed in solving the problem of detecting vehicles in a video stream image.
+# Vehicle Detection and Tracking
 
----
+![Sample](output_images/report_img/result.png)
 
-**Vehicle Detection Project**
+## This is a short report containing a brief description of the main strategies and methods employed in solving the problem of detecting vehicles in a video stream image.
 
+See Video Result [here](https://youtu.be/Fkxe-Hxgbqw)
+
+
+## Goals
 The goals / steps of this project are the following:
 
 * Perform a Histogram of Oriented Gradients (HOG) feature extraction on a labeled training set of images and train a classifier Linear SVM classifier
@@ -31,13 +34,10 @@ The goals / steps of this project are the following:
 
 [video1]: ./output_images/project_output.mp4
 
-## [Rubric](https://review.udacity.com/#!/rubrics/513/view) Points
-###Here I will consider the rubric points individually and describe how I addressed each point in my implementation.  
 
----
-###Histogram of Oriented Gradients (HOG)
+## Histogram of Oriented Gradients (HOG)
 
-####1. Extraction of HOG features from the training images.
+### 1. Extraction of HOG features from the training images.
 
 
 The code for this step is contained in the first code cell of the IPython notebook (or in lines # through # of the file called `vehicle_detection.ipynb`).  
@@ -58,7 +58,7 @@ Here is an example using the `HSV` color space and HOG parameters of `orientatio
 
 ![alt text][im2]
 
-####2. Final choice of HOG parameters.
+### 2. Final choice of HOG parameters.
 
 I tried various combinations of parameters, including changing the number of orientations (6, 9 and 12) and testing the effect on the performance of the svm prediction in the test set. In this case using 9 orientations seems to work slightly better.
 
@@ -70,7 +70,7 @@ Next I varied the number of pixels per cell (8 or 16) and combined with a differ
 
 As shown above the best combination for the tested scenarios is using 8 pixels per cell and 2 cells per block, yielding a better accuracy in the classification of the test set.
 
-#####Feature extraction methods
+#### Feature extraction methods
 I investigated using other features as spatial (which uses the entire color profile of the image) and the histogram (which groups colors in bins).
 
 ![alt text][im5]
@@ -88,7 +88,7 @@ Here are the results for the top 10:
 By looking at the results we can see that the *HSV_spa_hist_hog2* (combining HSV spatial, histogram and hog on V channel) together with *HSV_his_hog_all* (combining HSV histogram and hog on the 3 channels) are the methods with higher accuracy (0.99) on the test set. However the former outperforms the latter by far when looking at the computational time required to extract the features. As such it was decided to proceed with this *HSV_spa_hist_hog2* combination of features.
 
 
-####3. How to train the classifier using the selected features
+### 3. How to train the classifier using the selected features
 
 To handle the feature extraction and training of a classifier I created a class named CarDetector which has all the parameters defined and loaded in the __init method. It comprises all the methods necessary for feature extraction including color spatial features, histograms and hog features. I used a linear SVM using the default parameters.
 All the features (spatial, histogram and hog) previously described were extracted from the training data and used to train the svm classifier. Features were scaled to zero mean and unit variance before training the classifier using the StandardScaler() method.
@@ -107,9 +107,9 @@ svc = LinearSVC()
 svc.fit(X_train, y_train)
 ```
 
-###Sliding Window Search
+## Sliding Window Search
 
-####1. Parameters for the sliding window search: scales and overlap
+### 1. Parameters for the sliding window search: scales and overlap
 
 The number and distribution of windows across the image are very important parameters as they influence the quality and the speed of detection of vehicles in the image.
 First of all it was decided not to search for vehicles in the upper part of the image as it includes mostly the horizon and sky which are not relevant for the task.
@@ -119,7 +119,7 @@ Then, through experimentation, by varying the number, size and overlap of window
 
 Note that special care was taken in not considering the lower part of the image because it contains part of our car. Also, the number of rectangles spans the entire width of the camera from left to right.
 
-####2. Pipeline description.  Minimize false positives and reliably detect cars.
+### 2. Pipeline description.  Minimize false positives and reliably detect cars.
 
 As described before the feature extraction and training of the classification method was taken very careful in order to assure a good detection and low number of false positives.
 The pipeline works as follows. The source image (1) is taken from the video stream. A search is conducted in the image using all the rectangles previously defined by the sliding window (2). Then, the ones which the classifier considers to be positive results (3) are converted to a first temporary heat map (4). From this provisional heat map only the strongest signals are then filtered (5) and prepared for merge with the existing heat map in a ratio of 20% to 80%. After merging, the final heat (6) map is then further filtered by considering only the most heated regions (above 100 rgb values) to be positive.
@@ -132,15 +132,15 @@ The result shows only regions of high certainty where vehicles are being detecte
 
 ---
 
-### Video Implementation
+##  Video Implementation
 
-####1. Final video output.  
+### 1. Final video output.  
 
 The pipeline works quiet well on identifying positive cars. There are almost no false positives although sometimes due to the nature of the implemented filter, there are some failures in detecting the vehicles continuously.
 Here's a [link to my video result](./output_images/project_output.mp4)
 
 
-####2. Filter for false positives and combining overlapping bounding boxes in a heat map.
+### 2. Filter for false positives and combining overlapping bounding boxes in a heat map.
 
 I recorded the positions of positive detections in each frame of the video.  From the positive detections I created a heat map and then threshold that map to identify vehicle positions.
 
@@ -157,7 +157,7 @@ In the pipeline the filtering part comprises:
 
 ```javascript
 decay = 0.05
-# apply decay to the heat_map
+#apply decay to the heat_map
 process_image.heat_map_old = process_image.heat_map_old*(1-decay)
 
 #get heat_map
@@ -166,13 +166,14 @@ heat_map = get_heat_map(img,process_image.rectangles,process_image.car_detector,
 #filter the heat map to get rid of false positives
 filtered_heat_map = filter_heat_map(heat_map,th_ratio=0.5)
 valid_data = get_detected(filtered_heat_map,area_th = 1000,heat_th=heat_thres)
-# now that we know the location of valid positives
-# we can use the original heat map to get the complete area and filter out false positives
+
+#now that we know the location of valid positives
+#we can use the original heat map to get the complete area and filter out false positives
 filtered_heat_map = filter_heat_map(heat_map,th_ratio=0.05)
 data = get_detected(filtered_heat_map,area_th = 1000,heat_th=heat_thres)
 posit_data = filter_by_location(data, valid_data)
 
-# now we create a new filtered_heat_map with the posit_data only
+#now we create a new filtered_heat_map with the posit_data only
 filtered_heat_map = create_map_from_data(img,posit_data,heat_increment=255)
 
 process_image.heat_map_old = (filtered_heat_map*0.2 + process_image.heat_map_old*0.8)
@@ -210,9 +211,9 @@ def get_detected(heat_map,area_th = 20,heat_th=80):
     return data
 ```
 
-###Discussion
+## Discussion
 
-####1. Issues of this project and further work
+### 1. Issues of this project and further work
 
 This project is working relatively well on most of the video frames. There are very few number of false positives and for really close cars it performs the detection very accurately. There is still plenty room to improve on several aspects, though.
 I soon realized that the bottleneck was in the feature extraction methods. Depending on the methods you chose you may compromise no only the quality but also the computation time required for classification.
